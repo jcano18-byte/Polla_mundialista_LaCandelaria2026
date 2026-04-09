@@ -410,7 +410,7 @@ const BM=[
   {id:96,phase:'Final',group:null,home:'Final A',away:'Final B',date:'2026-07-19T18:00'}
 ];
 
-let CU=null,isAdmin=false,AM=[],AP=[],APreds={},PP={},pendingLogin=null;
+let CU=null,isAdmin=false,AM=[],AP=[],APreds={},PP={},pendingLogin=null,adminToken=null;
 let mPhase='Grupos',mGroup='Todos',pPhase='Grupos',cPhase='Grupos',cGroup='Todos';
 let selPlayers=new Set();
 
@@ -447,7 +447,7 @@ async function loginAdmin(){
   err.style.display='none';
   try{
     const r=await api('loginAdmin',{username:user,password:pass});
-    if(r.ok){CU={name:'Administrador',id:'admin'};isAdmin=true;startApp();}
+    if(r.ok){CU={name:'Administrador',id:'admin'};isAdmin=true;adminToken=r.adminToken;startApp();}
     else showErr(err,r.msg||'Credenciales incorrectas');
   }catch(e){showErr(err,'Error de conexión.');}
 }
@@ -498,7 +498,7 @@ function startApp(){
   loadData();showTab('ranking');
 }
 function logout(){
-  CU=null;isAdmin=false;AM=[];AP=[];APreds={};PP={};pendingLogin=null;selPlayers=new Set();
+  CU=null;isAdmin=false;AM=[];AP=[];APreds={};PP={};pendingLogin=null;adminToken=null;selPlayers=new Set();
   ['login-screen','pin-change-screen'].forEach(id=>document.getElementById(id).style.display=id==='login-screen'?'flex':'none');
   document.getElementById('app-screen').style.display='none';
   document.getElementById('p-username').value='';document.getElementById('p-pin').value='';
@@ -675,7 +675,7 @@ async function addPlayer(){
   if(!name||!pin){msgEl.innerHTML='<div class="alert alert-error">Nombre y PIN son obligatorios</div>';return}
   msgEl.innerHTML='<div class="alert alert-info">Guardando...</div>';
   try{
-    const r=await apiPost('addPlayer',{name,pin,team});
+    const r=await apiPost('addPlayer',{name,pin,team,adminToken});
     if(r.ok){msgEl.innerHTML=`<div class="alert alert-success">✓ ${name} agregado. PIN temporal: <strong>${pin}</strong></div>`;document.getElementById('new-name').value='';document.getElementById('new-pin').value='';document.getElementById('new-team').value='';await loadData();}
     else msgEl.innerHTML=`<div class="alert alert-error">${r.msg}</div>`;
   }catch(e){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';}
@@ -686,7 +686,7 @@ async function saveMatchResult(){
   if(!id||h===''||a===''){msgEl.innerHTML='<div class="alert alert-error">Selecciona partido y ambos marcadores</div>';return}
   msgEl.innerHTML='<div class="alert alert-info">Guardando...</div>';
   try{
-    const r=await apiPost('saveMatchResult',{matchId:parseInt(id),homeScore:parseInt(h),awayScore:parseInt(a)});
+    const r=await apiPost('saveMatchResult',{matchId:parseInt(id),homeScore:parseInt(h),awayScore:parseInt(a),adminToken});
     if(r.ok){msgEl.innerHTML='<div class="alert alert-success">✓ Resultado guardado</div>';await loadData();}
     else msgEl.innerHTML=`<div class="alert alert-error">${r.msg}</div>`;
   }catch(e){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';}
@@ -697,7 +697,7 @@ function renderAdminPlayers(){
   if(!AP.length){c.innerHTML='<div class="empty">No hay jugadores aún</div>';return}
   c.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Equipo</th><th>PIN</th><th>Pronósticos</th><th>Pts</th><th></th></tr></thead><tbody>${AP.map(p=>{const s=calcStats(p.id);return `<tr><td><div class="flex"><div class="avatar">${p.name.slice(0,2).toUpperCase()}</div>${p.name}</div></td><td style="color:var(--text2);font-size:13px">${p.team||'—'}</td><td>${p.pinChanged?'<span class="badge badge-green">✓ Propio</span>':'<span class="badge badge-amber">Temporal</span>'}</td><td style="color:var(--text3);font-size:13px">${s.cnt}/${AM.length}</td><td><strong>${s.tot}</strong></td><td><button class="btn btn-sm btn-danger" onclick="removePlayer('${p.id}','${p.name}')">Eliminar</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
-async function removePlayer(id,name){if(!confirm(`¿Eliminar a ${name} y todos sus pronósticos?`))return;try{const r=await apiPost('removePlayer',{playerId:id});if(r.ok)await loadData();else alert('Error: '+r.msg);}catch(e){alert('Error de conexión');}}
+async function removePlayer(id,name){if(!confirm(`¿Eliminar a ${name} y todos sus pronósticos?`))return;try{const r=await apiPost('removePlayer',{playerId:id,adminToken});if(r.ok)await loadData();else alert('Error: '+r.msg);}catch(e){alert('Error de conexión');}}
 
 // UI
 function showTab(tab){
