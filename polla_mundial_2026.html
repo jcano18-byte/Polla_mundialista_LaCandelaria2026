@@ -212,6 +212,7 @@ tr:hover td{background:var(--bg3)}
         <div class="metric"><div class="metric-label">Por jugar</div><div class="metric-value" id="m-pending">—</div></div>
         <div class="metric"><div class="metric-label">Mi posición</div><div class="metric-value" id="m-mypos">—</div></div>
       </div>
+      <div id="champion-banner" style="display:none;margin-bottom:1rem"></div>
       <div id="podium-area" style="display:none"></div>
       <div class="card">
         <div class="card-title">Tabla general</div>
@@ -224,6 +225,7 @@ tr:hover td{background:var(--bg3)}
           <div style="background:var(--bg3);border-radius:var(--radius);padding:10px"><div style="font-size:22px;font-weight:700;color:var(--amber);font-family:'Barlow Condensed',sans-serif">3 pts</div><div style="font-size:13px;color:var(--text2)">Ganador + diferencia exacta</div></div>
           <div style="background:var(--bg3);border-radius:var(--radius);padding:10px"><div style="font-size:22px;font-weight:700;color:var(--blue);font-family:'Barlow Condensed',sans-serif">2 pts</div><div style="font-size:13px;color:var(--text2)">Solo ganador / empate</div></div>
           <div style="background:var(--bg3);border-radius:var(--radius);padding:10px"><div style="font-size:22px;font-weight:700;color:var(--text3);font-family:'Barlow Condensed',sans-serif">0 pts</div><div style="font-size:13px;color:var(--text2)">Pronóstico incorrecto</div></div>
+          <div style="background:rgba(245,158,11,.08);border:1px solid var(--amber);border-radius:var(--radius);padding:10px;grid-column:span 2"><div style="font-size:22px;font-weight:700;color:var(--amber);font-family:'Barlow Condensed',sans-serif">+10 pts 🏆</div><div style="font-size:13px;color:var(--text2)">Tu equipo favorito gana el Mundial</div></div>
         </div>
       </div>
     </div>
@@ -300,6 +302,20 @@ tr:hover td{background:var(--bg3)}
           <button class="btn btn-green" onclick="saveMatchResult()">Guardar resultado</button>
           <div id="admin-match-msg" style="margin-top:8px"></div>
         </div>
+      </div>
+      <!-- Champion -->
+      <div class="card" style="margin-bottom:1.5rem;border-color:var(--amber)">
+        <div class="card-title" style="color:var(--amber)">🏆 Registrar Campeón Mundial</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Al registrar el campeón, se suman automáticamente 10 puntos a los jugadores cuyo equipo favorito sea ese país.</p>
+        <div style="display:flex;gap:10px;align-items:flex-end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label>Equipo campeón</label>
+            <select id="champion-select"><option value="">— Seleccionar equipo —</option></select>
+          </div>
+          <button class="btn btn-green" style="width:auto;padding:10px 20px;white-space:nowrap" onclick="saveChampion()">Guardar</button>
+        </div>
+        <div id="champion-msg" style="margin-top:8px"></div>
+        <div id="current-champion-display" style="margin-top:10px;display:none"></div>
       </div>
       <div class="card">
         <div class="card-title">Participantes registrados</div>
@@ -411,7 +427,7 @@ const BM=[
   {id:96,phase:'Final',group:null,home:'Final A',away:'Final B',date:'2026-07-19T18:00'}
 ];
 
-let CU=null,isAdmin=false,AM=[],AP=[],APreds={},PP={},pendingLogin=null,adminToken=null;
+let CU=null,isAdmin=false,AM=[],AP=[],APreds={},PP={},pendingLogin=null,adminToken=null,champion=null;
 let mPhase='Grupos',mGroup='Todos',pPhase='Grupos',cPhase='Grupos',cGroup='Todos';
 let selPlayers=new Set();
 
@@ -421,6 +437,8 @@ window.onload=()=>{
   if(s)s.innerHTML='<option value="">— Ninguno —</option>'+TEAMS.map(t=>`<option>${t}</option>`).join('');
   const ms=document.getElementById('admin-match-select');
   if(ms)ms.innerHTML='<option value="">— Seleccionar —</option>'+BM.map(m=>`<option value="${m.id}">[${m.phase}${m.group?' G'+m.group:''}] ${m.home} vs ${m.away}</option>`).join('');
+  const cs=document.getElementById('champion-select');
+  if(cs)cs.innerHTML='<option value="">— Seleccionar equipo —</option>'+TEAMS.map(t=>`<option>${t}</option>`).join('');
 };
 
 // AUTH
@@ -515,6 +533,7 @@ async function loadData(){
     const r=await api('getData');
     AP=r.players||[];APreds=r.predictions||{};
     AM=BM.map(m=>{const s=(r.matches||[]).find(x=>x.id==m.id);return s?{...m,...s}:{...m,homeScore:null,awayScore:null};});
+    champion=r.champion||null;
     renderRanking();renderMatches();renderPredictions();renderCompareChips();
     if(isAdmin)renderAdminPlayers();
   }catch(e){console.error(e);}
@@ -532,9 +551,23 @@ function pts(ph,pa,rh,ra){
 function calcStats(pid){
   let tot=0,ex=0,par=0,wr=0,pen=0;const pr=APreds[pid]||{};
   AM.forEach(m=>{const p=pr[m.id];if(!p)return;const pt=pts(p.home,p.away,m.homeScore,m.awayScore);if(pt===null){pen++;return}tot+=pt;if(pt===5)ex++;else if(pt>=2)par++;else wr++;});
-  return{tot,ex,par,wr,pen,cnt:Object.keys(pr).length};
+  // Bonus +10 si el equipo favorito del jugador es campeón
+  const player=AP.find(p=>p.id==pid);
+  const bonus=(champion&&player&&player.team&&player.team.toLowerCase()===champion.toLowerCase())?10:0;
+  tot+=bonus;
+  return{tot,ex,par,wr,pen,cnt:Object.keys(pr).length,bonus};
 }
 function renderRanking(){
+  // Champion banner
+  const cb=document.getElementById('champion-banner');
+  if(champion){
+    cb.style.display='block';
+    cb.innerHTML=`<div style="background:rgba(245,158,11,.1);border:1px solid var(--amber);border-radius:var(--radius-lg);padding:14px 18px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:28px">🏆</span>
+      <div><div style="font-size:13px;color:var(--amber);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Campeón Mundial 2026</div>
+      <div style="font-size:20px;font-weight:700;font-family:'Barlow Condensed',sans-serif;color:#fff">${champion}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">Los participantes que eligieron este equipo reciben +10 puntos</div></div></div>`;
+  } else cb.style.display='none';
   const played=AM.filter(m=>m.homeScore!==null&&m.awayScore!==null).length;
   document.getElementById('m-players').textContent=AP.length;
   document.getElementById('m-played').textContent=played;
@@ -553,7 +586,7 @@ function renderRanking(){
   tbl.innerHTML=`<div class="table-wrap"><table><thead><tr><th>#</th><th>Jugador</th><th>Pts</th><th>Exactos</th><th>Parciales</th><th>Fallidos</th><th>Pronósticos</th></tr></thead><tbody>${rows.map((r,i)=>`<tr style="${r.id==CU?.id?'background:rgba(34,197,94,.04)':''}">
     <td style="font-weight:700;font-family:'Barlow Condensed',sans-serif;font-size:18px;color:${i===0?'var(--amber)':i===1?'var(--text2)':i===2?'var(--green)':'var(--text3)'}">${i+1}</td>
     <td><div class="flex"><div class="avatar" style="${i===0?'background:rgba(245,158,11,.15);color:var(--amber)':''}">${r.name.slice(0,2).toUpperCase()}</div><div><div style="font-weight:500">${r.name}${r.id==CU?.id?' <span style="font-size:11px;color:var(--green)">(tú)</span>':''}</div><div style="font-size:11px;color:var(--text3)">${r.team||''}</div></div></div></td>
-    <td><strong style="font-size:16px;font-family:'Barlow Condensed',sans-serif">${r.tot}</strong></td>
+    <td><strong style="font-size:16px;font-family:'Barlow Condensed',sans-serif">${r.tot}</strong>${r.bonus>0?'<span style="font-size:11px;color:var(--amber);margin-left:4px">+10 🏆</span>':''}</td>
     <td><span class="badge badge-green">${r.ex}</span></td>
     <td><span class="badge badge-amber">${r.par}</span></td>
     <td><span class="badge badge-red">${r.wr}</span></td>
@@ -700,6 +733,29 @@ function renderAdminPlayers(){
 }
 async function removePlayer(id,name){if(!confirm(`¿Eliminar a ${name} y todos sus pronósticos?`))return;try{const r=await apiPost('removePlayer',{playerId:id,adminToken});if(r.ok)await loadData();else alert('Error: '+r.msg);}catch(e){alert('Error de conexión');}}
 
+// CHAMPION
+async function saveChampion(){
+  const team=document.getElementById('champion-select').value;
+  const msgEl=document.getElementById('champion-msg');
+  if(!team){msgEl.innerHTML='<div class="alert alert-error">Selecciona un equipo</div>';return}
+  msgEl.innerHTML='<div class="alert alert-info">Guardando...</div>';
+  try{
+    const r=await apiPost('saveChampion',{team,adminToken});
+    if(r.ok){
+      champion=team;
+      msgEl.innerHTML=`<div class="alert alert-success">✓ Campeón registrado: <strong>${team}</strong></div>`;
+      renderRanking();renderAdminPlayers();showCurrentChampion();
+    } else msgEl.innerHTML=`<div class="alert alert-error">${r.msg}</div>`;
+  }catch(e){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';}
+  setTimeout(()=>msgEl.innerHTML='',4000);
+}
+function showCurrentChampion(){
+  const d=document.getElementById('current-champion-display');
+  if(!d)return;
+  if(champion){d.style.display='block';d.innerHTML=`<div style="background:rgba(245,158,11,.1);border:1px solid var(--amber);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--amber)">🏆 Campeón actual: <strong>${champion}</strong></div>`;}
+  else d.style.display='none';
+}
+
 // UI
 function showTab(tab){
   ['ranking','partidos','predicciones','comparar','admin'].forEach(t=>{
@@ -707,7 +763,7 @@ function showTab(tab){
     document.getElementById('nt-'+t)?.classList.toggle('active',t===tab);
   });
   if(tab==='comparar'){renderCompareGroupFilter();renderCompareList();}
-  if(tab==='admin')renderAdminPlayers();
+  if(tab==='admin'){renderAdminPlayers();showCurrentChampion();}
 }
 function fmt(ds){const d=new Date(ds);return d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});}
 </script>
