@@ -231,6 +231,7 @@ tr:hover td{background:var(--bg3)}
     <div class="nav-item" onclick="showTab('partidos')" id="nt-partidos">Partidos</div>
     <div class="nav-item" onclick="showTab('predicciones')" id="nt-predicciones">Mis pronósticos</div>
     <div class="nav-item" onclick="showTab('comparar')" id="nt-comparar">Ver pronósticos</div>
+    <div class="nav-item" onclick="showTab('pago')" id="nt-pago">💳 Mi pago</div>
     <div class="nav-item" onclick="showTab('admin')" id="nt-admin" style="display:none">⚙ Admin</div>
   </div>
   <div class="content">
@@ -294,6 +295,30 @@ tr:hover td{background:var(--bg3)}
       <div class="phase-filter" id="compare-phase-filter"></div>
       <div class="phase-filter" id="compare-group-filter" style="gap:4px;display:none"></div>
       <div id="compare-list"><div class="empty">Selecciona participantes arriba para comparar sus pronósticos</div></div>
+    </div>
+
+    <!-- PAGO -->
+    <div id="tab-pago" style="display:none">
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-title">💳 Estado de tu pago</div>
+        <div id="pay-status-area" style="margin-bottom:1.5rem"></div>
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;margin-bottom:1rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text2)">Inscripción Polla Mundial 2026</span>
+            <span style="font-size:18px;font-weight:700;font-family:'Barlow Condensed',sans-serif;color:#fff">$70.000 COP</span>
+          </div>
+          <div style="font-size:12px;color:var(--text3)">Pago único · No reembolsable · Usuario sin pagar no participa</div>
+        </div>
+        <div id="pay-btn-area"></div>
+        <div style="margin-top:1rem;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text3);line-height:1.6">
+          <strong style="color:var(--text2)">¿Cómo funciona?</strong><br>
+          Al hacer clic en "Pagar" se abre la pasarela segura de Wompi. Puedes pagar con tarjeta de crédito/débito, PSE, Nequi o Bancolombia a un clic. Cuando termines regresa aquí. El admin confirmará tu participación.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--amber)">🏆 Premio estimado</div>
+        <div id="pay-prize-preview"></div>
+      </div>
     </div>
 
     <!-- ADMIN -->
@@ -702,14 +727,40 @@ function renderPredictions(){
 }
 function stagePred(mid,side,val){if(!PP[mid])PP[mid]={};PP[mid][side]=val===''?null:parseInt(val);}
 async function savePredictions(){
-  if(!CU)return;const myP=APreds[CU.id]||{};const toS={};
-  Object.keys(PP).forEach(mid=>{const m=AM.find(x=>x.id==mid);if(!m||new Date(m.date)<=now)return;const e=myP[mid]||{};toS[mid]={home:PP[mid].h??e.home??null,away:PP[mid].a??e.away??null};});
-  if(!Object.keys(toS).length){showPM('No hay pronósticos nuevos para guardar','var(--amber)');return}
-  const msg=document.getElementById('pred-msg');msg.textContent='Guardando...';msg.style.color='var(--text2)';msg.style.opacity=1;
+  if(!CU)return;
+  const myP=APreds[CU.id]||{};
+  const toS={};let incomplete=0;
+  // Save all matches in current phase that have both scores — partial across matches is OK
+  AM.filter(m=>m.phase===pPhase).forEach(m=>{
+    if(isMatchLocked(m.date))return;
+    const staged=PP[m.id]||{};
+    const existing=myP[m.id]||{};
+    const hRaw=staged.h!==undefined?staged.h:(existing.home!==undefined&&existing.home!==null?existing.home:null);
+    const aRaw=staged.a!==undefined?staged.a:(existing.away!==undefined&&existing.away!==null?existing.away:null);
+    const hEl=document.getElementById('pr-'+m.id+'-h');
+    const aEl=document.getElementById('pr-'+m.id+'-a');
+    const hVal=hEl&&hEl.value!==''?parseInt(hEl.value):hRaw;
+    const aVal=aEl&&aEl.value!==''?parseInt(aEl.value):aRaw;
+    if(hVal!==null&&hVal!==undefined&&!isNaN(hVal)&&aVal!==null&&aVal!==undefined&&!isNaN(aVal)){
+      toS[m.id]={home:hVal,away:aVal};
+    } else if((hVal!==null&&hVal!==undefined&&!isNaN(hVal))||(aVal!==null&&aVal!==undefined&&!isNaN(aVal))){
+      incomplete++;
+    }
+  });
+  if(!Object.keys(toS).length&&incomplete===0){showPM('No hay pronósticos nuevos que guardar','var(--amber)');return}
+  if(!Object.keys(toS).length&&incomplete>0){showPM(`Llena ambos marcadores en los ${incomplete} partido${incomplete>1?'s':''} que tienes a medias`,'var(--amber)');return}
+  const msg=document.getElementById('pred-msg');
+  msg.textContent='Guardando...';msg.style.color='var(--text2)';msg.style.opacity=1;
   try{
     const r=await apiPost('savePredictions',{playerId:CU.id,predictions:toS});
-    if(r.ok){if(!APreds[CU.id])APreds[CU.id]={};Object.assign(APreds[CU.id],toS);PP={};showPM('✓ Pronósticos guardados','var(--green)');renderRanking();}
-    else showPM('Error: '+r.msg,'var(--red)');
+    if(r.ok){
+      if(!APreds[CU.id])APreds[CU.id]={};
+      Object.assign(APreds[CU.id],toS);PP={};
+      const saved=Object.keys(toS).length;
+      const note=incomplete>0?` · ${incomplete} partido${incomplete>1?'s':''} sin completar`:'';
+      showPM(`✓ ${saved} pronóstico${saved!==1?'s':''} guardado${saved!==1?'s':''}${note}`,'var(--green)');
+      renderRanking();renderPredictions();
+    } else showPM('Error: '+r.msg,'var(--red)');
   }catch(e){showPM('Error de conexión','var(--red)');}
 }
 function showPM(txt,col){const m=document.getElementById('pred-msg');m.textContent=txt;m.style.color=col;m.style.opacity=1;setTimeout(()=>m.style.opacity=0,3000);}
@@ -790,7 +841,7 @@ async function saveMatchResult(){
 function renderAdminPlayers(){
   const c=document.getElementById('admin-players-list');
   if(!AP.length){c.innerHTML='<div class="empty">No hay jugadores aún</div>';return}
-  c.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Equipo</th><th>PIN</th><th>Pronósticos</th><th>Pts</th><th></th></tr></thead><tbody>${AP.map(p=>{const s=calcStats(p.id);return `<tr><td><div class="flex"><div class="avatar">${p.name.slice(0,2).toUpperCase()}</div>${p.name}</div></td><td style="color:var(--text2);font-size:13px">${p.team||'—'}</td><td>${p.pinChanged?'<span class="badge badge-green">✓ Propio</span>':'<span class="badge badge-amber">Temporal</span>'}</td><td style="color:var(--text3);font-size:13px">${s.cnt}/${AM.length}</td><td><strong>${s.tot}</strong></td><td><button class="btn btn-sm btn-danger" onclick="removePlayer('${p.id}','${p.name}')">Eliminar</button></td></tr>`;}).join('')}</tbody></table></div>`;
+  c.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Equipo</th><th>PIN</th><th>Pronósticos</th><th>Pts</th><th></th></tr></thead><tbody>${AP.map(p=>{const s=calcStats(p.id);return `<tr><td><div class="flex"><div class="avatar">${p.name.slice(0,2).toUpperCase()}</div>${p.name}</div></td><td style="color:var(--text2);font-size:13px">${p.team||'—'}</td><td>${p.pinChanged?'<span class="badge badge-green">✓ Propio</span>':'<span class="badge badge-amber">Temporal</span>'}</td><td>${!!paidPlayers[p.id]?'<span class="badge badge-green">✓ Pagó</span>':`<button class="btn btn-sm" style="border-color:var(--green);color:var(--green);font-size:11px;padding:3px 8px" onclick="togglePaid('${p.id}',true)">Marcar pagado</button>`}${!!paidPlayers[p.id]?`<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;margin-left:4px" onclick="togglePaid('${p.id}',false)">Revertir</button>":''}</td><td style="color:var(--text3);font-size:13px">${s.cnt}/${AM.length}</td><td><strong>${s.tot}</strong></td><td><button class="btn btn-sm btn-danger" onclick="removePlayer('${p.id}','${p.name}')">Eliminar</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
 async function removePlayer(id,name){if(!confirm(`¿Eliminar a ${name} y todos sus pronósticos?`))return;try{const r=await apiPost('removePlayer',{playerId:id,adminToken});if(r.ok)await loadData();else alert('Error: '+r.msg);}catch(e){alert('Error de conexión');}}
 
@@ -885,6 +936,47 @@ function renderPrizes(){
     <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">En caso de empate el premio se divide entre los empatados · $70.000 COP por participante</div>`;
 }
 
+// PAYMENT
+function renderPayTab(){
+  if(!CU||isAdmin)return;
+  const isPaid=!!paidPlayers[CU.id];
+  const statusEl=document.getElementById('pay-status-area');
+  const btnEl=document.getElementById('pay-btn-area');
+  if(statusEl){
+    statusEl.innerHTML=isPaid
+      ?'<div style="background:var(--green-bg);border:1px solid var(--green-dim);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--green);display:inline-flex;align-items:center;gap:8px"><span style=\"font-size:18px\">✅</span> Pago confirmado — estás participando oficialmente</div>'
+      :'<div style="background:var(--red-bg);border:1px solid var(--red);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--red);display:inline-flex;align-items:center;gap:8px"><span style=\"font-size:18px\">⚠️</span> Pago pendiente — realiza tu pago para participar</div>';
+  }
+  if(btnEl){
+    if(isPaid){
+      btnEl.innerHTML='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--text3)">✓ Pago ya realizado</div>';
+    } else {
+      // Remove previous widget if any
+      const old=document.getElementById('wompi-widget-container');
+      if(old)old.remove();
+      const ref='POLLA26-'+CU.name.replace(/\s/g,'').slice(0,8)+'-'+Date.now().toString().slice(-4);
+      btnEl.innerHTML='<div id="wompi-widget-container" style="margin-bottom:8px"></div><div style="font-size:11px;color:var(--text3)">Ref: '+ref+'</div>';
+      const form=document.createElement('form');
+      const sc=document.createElement('script');
+      sc.src='https://checkout.wompi.co/widget.js';
+      sc.setAttribute('data-render','button');
+      sc.setAttribute('data-public-key',WOMPI_PUB_KEY);
+      sc.setAttribute('data-currency',WOMPI_CURRENCY);
+      sc.setAttribute('data-amount-in-cents',WOMPI_AMOUNT.toString());
+      sc.setAttribute('data-reference',ref);
+      sc.setAttribute('data-redirect-url',WOMPI_REDIRECT_URL);
+      sc.setAttribute('data-customer-data:full-name',CU.name);
+      form.appendChild(sc);
+      document.getElementById('wompi-widget-container').appendChild(form);
+    }
+  }
+  const prizeEl=document.getElementById('pay-prize-preview');
+  if(prizeEl){
+    const n=AP.length,total=n*70000,p1=Math.floor(total*.75),p2=total-p1;
+    prizeEl.innerHTML='<div style="display:flex;gap:8px"><div style="flex:1;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:12px;text-align:center"><div style="font-size:11px;color:var(--amber);margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px">🥇 Primer puesto</div><div style="font-size:20px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:#fff">'+p1.toLocaleString('es-CO')+' COP</div></div><div style="flex:1;background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center"><div style="font-size:11px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px">🥈 Segundo puesto</div><div style="font-size:18px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:#fff">'+p2.toLocaleString('es-CO')+' COP</div></div></div><div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">'+n+' participante'+(n!==1?'s':'')+' · $'+total.toLocaleString('es-CO')+' COP en total</div>';
+  }
+}
+
 // PHASES CONFIG
 const PHASES = ['Grupos','16avos','Octavos','Cuartos','Semis','Final'];
 const PHASE_LABELS = {Grupos:'Fase de Grupos','16avos':'16avos de Final',Octavos:'Octavos de Final',Cuartos:'Cuartos de Final',Semis:'Semifinales',Final:'Final'};
@@ -914,12 +1006,21 @@ function buildPhaseButtons(containerId, currentPhase, onClickFn, showAll){
 }
 
 // UI
+async function togglePaid(playerId, paid){
+  try{
+    const r=await apiPost('setPaid',{playerId,paid,adminToken});
+    if(r.ok){paidPlayers[playerId]=paid;if(!paid)delete paidPlayers[playerId];renderAdminPlayers();}
+    else alert('Error: '+r.msg);
+  }catch(e){alert('Error de conexión');}
+}
+
 function showTab(tab){
-  ['ranking','partidos','predicciones','comparar','admin'].forEach(t=>{
+  ['ranking','partidos','predicciones','comparar','pago','admin'].forEach(t=>{
     document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
     document.getElementById('nt-'+t)?.classList.toggle('active',t===tab);
   });
   if(tab==='comparar'){renderCompareGroupFilter();renderCompareList();}
+  if(tab==='pago'){renderPayTab();}
   if(tab==='admin'){renderAdminPlayers();showCurrentChampion();renderPhaseToggles();}
 }
 function fmt(ds){const d=new Date(ds);return d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});}
