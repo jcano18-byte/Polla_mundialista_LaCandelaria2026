@@ -848,8 +848,31 @@ async function saveMatchResult(){
 function renderAdminPlayers(){
   const c=document.getElementById('admin-players-list');
   if(!AP.length){c.innerHTML='<div class="empty">No hay jugadores aún</div>';return}
-  c.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Equipo</th><th>PIN</th><th>Pronósticos</th><th>Pts</th><th></th></tr></thead><tbody>${AP.map(p=>{const s=calcStats(p.id);return `<tr><td><div class="flex"><div class="avatar">${p.name.slice(0,2).toUpperCase()}</div>${p.name}</div></td><td style="color:var(--text2);font-size:13px">${p.team||'—'}</td><td>${p.pinChanged?'<span class="badge badge-green">✓ Propio</span>':'<span class="badge badge-amber">Temporal</span>'}</td><td>${!!paidPlayers[p.id]?'<span class="badge badge-green">✓ Pagó</span>':`<button class="btn btn-sm" style="border-color:var(--green);color:var(--green);font-size:11px;padding:3px 8px" onclick="togglePaid('${p.id}',true)">Marcar pagado</button>`}${!!paidPlayers[p.id]?`<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;margin-left:4px" onclick="togglePaid('${p.id}',false)">Revertir</button>":''}</td><td style="color:var(--text3);font-size:13px">${s.cnt}/${AM.length}</td><td><strong>${s.tot}</strong></td><td><button class="btn btn-sm btn-danger" onclick="removePlayer('${p.id}','${p.name}')">Eliminar</button></td></tr>`;}).join('')}</tbody></table></div>`;
+  let rows='';
+  AP.forEach(function(p){
+    const s=calcStats(p.id);
+    const paid=!!paidPlayers[p.id];
+    const pinBadge=p.pinChanged?'<span class="badge badge-green">✓ Propio</span>':'<span class="badge badge-amber">Temporal</span>';
+    let payCell='';
+    if(paid){
+      payCell='<span class="badge badge-green">✓ Pagó</span>'
+        +'<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;margin-left:4px" onclick="togglePaid(''+p.id+'',false)">Revertir</button>';
+    } else {
+      payCell='<button class="btn btn-sm" style="border-color:var(--green);color:var(--green);font-size:11px;padding:3px 8px" onclick="togglePaid(''+p.id+'',true)">Marcar pagado</button>';
+    }
+    rows+='<tr>'
+      +'<td><div class="flex"><div class="avatar">'+p.name.slice(0,2).toUpperCase()+'</div>'+p.name+'</div></td>'
+      +'<td style="color:var(--text2);font-size:13px">'+(p.team||'—')+'</td>'
+      +'<td>'+pinBadge+'</td>'
+      +'<td>'+payCell+'</td>'
+      +'<td style="color:var(--text3);font-size:13px">'+s.cnt+'/'+AM.length+'</td>'
+      +'<td><strong>'+s.tot+'</strong></td>'
+      +'<td><button class="btn btn-sm btn-danger" onclick="removePlayer(''+p.id+'',''+p.name+'')">Eliminar</button></td>'
+      +'</tr>';
+  });
+  c.innerHTML='<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Equipo</th><th>PIN</th><th>Pago</th><th>Pronósticos</th><th>Pts</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
+
 async function removePlayer(id,name){if(!confirm(`¿Eliminar a ${name} y todos sus pronósticos?`))return;try{const r=await apiPost('removePlayer',{playerId:id,adminToken});if(r.ok)await loadData();else alert('Error: '+r.msg);}catch(e){alert('Error de conexión');}}
 
 // OPEN PHASES ADMIN
@@ -1015,7 +1038,10 @@ function buildPhaseButtons(containerId, currentPhase, onClickFn, showAll){
   const c = document.getElementById(containerId);
   if(!c) return;
   const phases = showAll ? PHASES : PHASES.filter(p=>openPhases[p]||p==='Grupos');
-  c.innerHTML = phases.map(p=>`<button class="phase-btn${p===currentPhase?' active':''}" onclick="${onClickFn}('${p}',this)">${PHASE_LABELS[p]}</button>`).join('');
+  c.innerHTML = phases.map(function(p){
+    const active = p===currentPhase?' active':'';
+    return '<button class="phase-btn'+active+'" onclick="'+onClickFn+'(\'' +p+ '\',this)">'+PHASE_LABELS[p]+'</button>';
+  }).join('');
 }
 
 // UI
