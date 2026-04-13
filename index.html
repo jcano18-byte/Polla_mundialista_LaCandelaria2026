@@ -376,6 +376,13 @@ tr:hover td{background:var(--bg3)}
           <strong style="color:var(--text2)">¿Cómo funciona?</strong><br>
           Haz clic en "Pagar" para ir a la pasarela segura de Wompi. Puedes pagar con tarjeta, PSE, Nequi o Bancolombia. Después de pagar, el admin confirma tu participación.
         </div>
+        <div style="margin-top:8px;padding:10px 13px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:12px;color:var(--amber);line-height:1.7">
+          <strong>⚠️ Comisión de Wompi</strong><br>
+          Wompi cobra una comisión por procesar el pago:<br>
+          • <strong>Tarjeta débito/crédito:</strong> ~1.98% ≈ $1.400 COP<br>
+          • <strong>Nequi, PSE, Bancolombia:</strong> ~2.65% + $700 + IVA ≈ $2.600 COP<br>
+          <span style="color:var(--text2)">Esta comisión la asume el pagador y no hace parte del recaudo de la polla.</span>
+        </div>
       </div>
       <div class="card">
         <div class="card-title" style="color:var(--amber)">🏆 Premio estimado</div>
@@ -439,7 +446,7 @@ tr:hover td{background:var(--bg3)}
 // CONFIG — edita estas dos líneas
 // ============================================================
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmcSBwO_267_g6eSq95HsssQj9DJB9pMq2pZnMFmLzEoAfL5xRQnCiEvvHw2qRCwvp6w/exec';
-var WOMPI_KEY  = 'pub_test_xwsBsMVxkfcNJYCsWGxE2acOG0uYeKSy'; // cambiar a pub_prod_... en producción
+var WOMPI_KEY  = 'pub_prod_BaRb4R1NAyTkY4tIlqIcNJzldVlGGUwH'; // producción activa
 var WOMPI_AMT  = 7000000; // $70.000 en centavos
 var WOMPI_REDIR = 'https://jcano18-byte.github.io/Polla_mundialista_LaCandelaria2026/';
 
