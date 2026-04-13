@@ -135,6 +135,32 @@ tr:hover td{background:var(--bg3)}
 .spinner{display:inline-block;width:22px;height:22px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:7px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .empty{text-align:center;padding:2.5rem;color:var(--text3);font-size:13px}
+/* BRACKET */
+.bracket-phase{margin-bottom:1.5rem}
+.bracket-phase-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.bracket-grid{display:grid;gap:6px}
+.bracket-match{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.bracket-match.played{border-color:rgba(34,197,94,.3)}
+.bracket-team{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px}
+.bracket-team-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.bracket-score{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;min-width:20px;text-align:right}
+.bracket-score.winner{color:var(--green)}
+.bracket-divider{height:1px;background:var(--border);margin:2px 0}
+.bracket-meta{font-size:10px;color:var(--text3);text-align:right}
+/* STANDINGS TABLE */
+.standings-table{width:100%;border-collapse:collapse;font-size:13px}
+.standings-table th{font-size:11px;color:var(--text3);padding:6px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.3px;font-weight:600;text-align:center}
+.standings-table th:first-child,.standings-table th:nth-child(2){text-align:left}
+.standings-table td{padding:8px 8px;border-bottom:1px solid var(--border);text-align:center}
+.standings-table td:first-child{text-align:left;font-weight:700;width:24px}
+.standings-table td:nth-child(2){text-align:left}
+.standings-table tr:last-child td{border-bottom:none}
+.standings-table tr:hover td{background:var(--bg3)}
+.qualified{background:rgba(34,197,94,.04)}
+.qualified-3rd{background:rgba(59,130,246,.04)}
+.pos-q{color:var(--green);font-weight:700}
+.pos-m{color:var(--amber);font-weight:700}
+.pos-e{color:var(--red);font-weight:700}
 /* DATE SEPARATOR */
 .date-sep{display:flex;align-items:center;gap:10px;margin-bottom:8px;margin-top:4px}
 .date-sep-line{height:1px;flex:1;background:var(--border)}
@@ -239,6 +265,7 @@ tr:hover td{background:var(--bg3)}
     <div class="nav-item" onclick="showTab('partidos')" id="nt-partidos">Partidos</div>
     <div class="nav-item" onclick="showTab('predicciones')" id="nt-predicciones">Mis pronósticos</div>
     <div class="nav-item" onclick="showTab('comparar')" id="nt-comparar">Ver pronósticos</div>
+    <div class="nav-item" onclick="showTab('fixture')" id="nt-fixture">📊 Fixture</div>
     <div class="nav-item" onclick="showTab('pago')" id="nt-pago">💳 Mi pago</div>
     <div class="nav-item" onclick="showTab('admin')" id="nt-admin" style="display:none">⚙ Admin</div>
   </div>
@@ -303,6 +330,33 @@ tr:hover td{background:var(--bg3)}
       <div class="phase-filter" id="cpf"></div>
       <div class="phase-filter" id="cgf" style="gap:4px;display:none"></div>
       <div id="cmp-list"></div>
+    </div>
+
+    <!-- FIXTURE / TABLA / LLAVES -->
+    <div id="tab-fixture" style="display:none">
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:4px;margin-bottom:1rem;background:var(--bg3);border-radius:8px;padding:4px;width:fit-content">
+        <button id="ft-grupos" onclick="showFixtureSub('grupos')" style="padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:Barlow,sans-serif;background:var(--bg4);color:var(--text);transition:all .2s">Grupos</button>
+        <button id="ft-tabla" onclick="showFixtureSub('tabla')" style="padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:Barlow,sans-serif;background:transparent;color:var(--text2);transition:all .2s">Tabla</button>
+        <button id="ft-llaves" onclick="showFixtureSub('llaves')" style="padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:Barlow,sans-serif;background:transparent;color:var(--text2);transition:all .2s">Llaves</button>
+      </div>
+
+      <!-- GRUPOS sub-tab -->
+      <div id="fs-grupos">
+        <div class="phase-filter" id="fix-group-filter" style="gap:4px"></div>
+        <div id="fix-matches-list"></div>
+      </div>
+
+      <!-- TABLA sub-tab -->
+      <div id="fs-tabla" style="display:none">
+        <div class="phase-filter" id="fix-table-group-filter" style="gap:4px"></div>
+        <div id="fix-table-content"></div>
+      </div>
+
+      <!-- LLAVES sub-tab -->
+      <div id="fs-llaves" style="display:none">
+        <div id="fix-bracket-content"></div>
+      </div>
     </div>
 
     <!-- MI PAGO -->
@@ -810,7 +864,10 @@ function renderMGroupFilter() {
   if(mPhase==='Grupos') {
     var gs=[]; BM.forEach(function(m){if(m.ph==='Grupos'&&gs.indexOf(m.gr)<0)gs.push(m.gr);}); gs.sort();
     var h='';
-    ['Todos'].concat(gs).forEach(function(g){h+='<button class="group-btn'+(mGroup===g?' active':'')+'" onclick="filterMGroup(\''+g+'\')">'+(g==='Todos'?'Todos':g)+'</button>';});
+  ['Todos'].concat(gs).forEach(function(g){
+    var active=mGroup===g?' active':'';
+    h+='<button class="group-btn'+active+'" data-g="'+g+'" onclick="filterMGroup(this.dataset.g)">'+(g==='Todos'?'Todos':g)+'</button>';
+  });
     gf.innerHTML=h; gf.style.display='flex';
   } else gf.style.display='none';
 }
@@ -965,7 +1022,10 @@ function renderCmpGroupFilter() {
   if(cPhase==='Grupos') {
     var gs=[]; BM.forEach(function(m){if(m.ph==='Grupos'&&gs.indexOf(m.gr)<0)gs.push(m.gr);}); gs.sort();
     var h='';
-    ['Todos'].concat(gs).forEach(function(g){h+='<button class="group-btn'+(cGroup===g?' active':'')+'" onclick="filterCGroup(\''+g+'\')">'+(g==='Todos'?'Todos':g)+'</button>';});
+  ['Todos'].concat(gs).forEach(function(g){
+    var active=cGroup===g?' active':'';
+    h+='<button class="group-btn'+active+'" data-g="'+g+'" onclick="filterCGroup(this.dataset.g)">'+(g==='Todos'?'Todos':g)+'</button>';
+  });
     gf.innerHTML=h; gf.style.display='flex';
   } else gf.style.display='none';
 }
@@ -1153,10 +1213,164 @@ function showChampionCurrent() {
 }
 
 // ============================================================
+// ============================================================
+// FIXTURE TAB
+// ============================================================
+var fixGroupSel = 'A';
+var fixTableGroupSel = 'A';
+var fixtureSub = 'grupos';
+
+function showFixtureSub(sub) {
+  fixtureSub = sub;
+  ['grupos','tabla','llaves'].forEach(function(s) {
+    el('fs-'+s).style.display = s===sub ? 'block' : 'none';
+    var btn = el('ft-'+s);
+    if (btn) {
+      btn.style.background = s===sub ? 'var(--bg4)' : 'transparent';
+      btn.style.color = s===sub ? 'var(--text)' : 'var(--text2)';
+    }
+  });
+  if (sub==='grupos') renderFixGroups();
+  if (sub==='tabla') renderFixTable();
+  if (sub==='llaves') renderFixBracket();
+}
+
+function renderFixture() {
+  renderFixGroupFilter();
+  renderFixTableGroupFilter();
+  showFixtureSub(fixtureSub);
+}
+
+function renderFixGroupFilter() {
+  var c = el('fix-group-filter'); if(!c) return;
+  var gs = [];
+  BM.forEach(function(m){if(m.ph==='Grupos'&&gs.indexOf(m.gr)<0)gs.push(m.gr);});
+  gs.sort();
+  var h = '';
+  gs.forEach(function(g){
+    var active=fixGroupSel===g?' active':'';
+    h+='<button class="group-btn'+active+'" data-g="'+g+'" onclick="selectFixGroup(this.dataset.g)">Grupo '+g+'</button>';
+  });
+  c.innerHTML = h;
+}
+
+function selectFixGroup(g) { fixGroupSel=g; renderFixGroupFilter(); renderFixGroups(); }
+
+function renderFixGroups() {
+  var c = el('fix-matches-list'); if(!c) return;
+  var matches = AM.filter(function(m){return m.ph==='Grupos'&&m.gr===fixGroupSel;});
+  if(!matches.length){c.innerHTML='<div class="empty">No hay partidos</div>';return;}
+  var byDay={};
+  matches.forEach(function(m){var d=m.d.substring(0,10);if(!byDay[d])byDay[d]=[];byDay[d].push(m);});
+  var h='';
+  Object.keys(byDay).sort().forEach(function(day) {
+    h+='<div class="date-sep"><div class="date-sep-line"></div><span class="date-sep-label" style="color:var(--text2)">'+fmtDay(day+'T12:00:00')+'</span><div class="date-sep-line"></div></div>';
+    byDay[day].forEach(function(m) {
+      var played=m.homeScore!==null&&m.awayScore!==null;
+      var hw=played&&m.homeScore>m.awayScore, aw=played&&m.awayScore>m.homeScore;
+      h+='<div class="bracket-match'+(played?' played':'')+'">';
+      h+='<div>';
+      h+='<div class="bracket-team"><span class="bracket-team-name" style="'+(hw?'color:var(--green)':'')+'">'+m.h+'</span><span class="bracket-score'+(hw?' winner':'')+'">'+( played?m.homeScore:'—')+'</span></div>';
+      h+='<div class="bracket-divider"></div>';
+      h+='<div class="bracket-team"><span class="bracket-team-name" style="'+(aw?'color:var(--green)':'')+'">'+m.a+'</span><span class="bracket-score'+(aw?' winner':'')+'">'+( played?m.awayScore:'—')+'</span></div>';
+      h+='</div>';
+      h+='<div class="bracket-meta">'+fmtTime(m.d)+(played?'<br><span class="badge badge-green" style="font-size:10px">FIN</span>':isLocked(m.d)?'<br><span class="badge badge-amber" style="font-size:10px">EN CURSO</span>':'<br><span class="badge badge-blue" style="font-size:10px">PRÓXIMO</span>')+'</div>';
+      h+='</div>';
+    });
+  });
+  c.innerHTML=h;
+}
+
+function renderFixTableGroupFilter() {
+  var c = el('fix-table-group-filter'); if(!c) return;
+  var gs=[];
+  BM.forEach(function(m){if(m.ph==='Grupos'&&gs.indexOf(m.gr)<0)gs.push(m.gr);});
+  gs.sort();
+  var h='';
+  gs.forEach(function(g){
+    var active=fixTableGroupSel===g?' active':'';
+    h+='<button class="group-btn'+active+'" data-g="'+g+'" onclick="selectFixTableGroup(this.dataset.g)">Grupo '+g+'</button>';
+  });
+  c.innerHTML=h;
+}
+
+function selectFixTableGroup(g) { fixTableGroupSel=g; renderFixTableGroupFilter(); renderFixTable(); }
+
+function renderFixTable() {
+  var c = el('fix-table-content'); if(!c) return;
+  var g = fixTableGroupSel;
+  var teams={};
+  BM.filter(function(m){return m.ph==='Grupos'&&m.gr===g;}).forEach(function(m) {
+    if(!teams[m.h]) teams[m.h]={name:m.h,pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0};
+    if(!teams[m.a]) teams[m.a]={name:m.a,pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0};
+    var match=AM.find(function(x){return x.id===m.id;});
+    if(!match||match.homeScore===null) return;
+    var hs=match.homeScore, as=match.awayScore;
+    teams[m.h].pj++; teams[m.h].gf+=hs; teams[m.h].gc+=as;
+    teams[m.a].pj++; teams[m.a].gf+=as; teams[m.a].gc+=hs;
+    if(hs>as){teams[m.h].pg++;teams[m.h].pts+=3;teams[m.a].pp++;}
+    else if(as>hs){teams[m.a].pg++;teams[m.a].pts+=3;teams[m.h].pp++;}
+    else{teams[m.h].pe++;teams[m.h].pts+=1;teams[m.a].pe++;teams[m.a].pts+=1;}
+  });
+  var rows=Object.values(teams);
+  rows.sort(function(a,b){
+    if(b.pts!==a.pts)return b.pts-a.pts;
+    if((b.gf-b.gc)!==(a.gf-a.gc))return(b.gf-b.gc)-(a.gf-a.gc);
+    return b.gf-a.gf;
+  });
+  var h='<div class="card"><div class="card-title">Grupo '+g+'</div><div class="table-wrap"><table class="standings-table">';
+  h+='<thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th></tr></thead><tbody>';
+  rows.forEach(function(t,i) {
+    var pos=i+1;
+    var rc=pos<=2?'qualified':pos===3?'qualified-3rd':'';
+    var pc=pos<=2?'pos-q':pos===3?'pos-m':'pos-e';
+    h+='<tr class="'+rc+'"><td class="'+pc+'">'+pos+'</td><td>'+t.name+'</td>';
+    h+='<td>'+t.pj+'</td><td>'+t.pg+'</td><td>'+t.pe+'</td><td>'+t.pp+'</td>';
+    h+='<td>'+t.gf+'</td><td>'+t.gc+'</td><td>'+(t.gf-t.gc>0?'+':'')+(t.gf-t.gc)+'</td>';
+    h+='<td><strong>'+t.pts+'</strong></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div style="display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--text3)"><span><span style="color:var(--green)">■</span> Clasifican directo</span><span><span style="color:var(--amber)">■</span> Posible 3er mejor</span></div></div>';
+  c.innerHTML=h;
+}
+
+function renderFixBracket() {
+  var c = el('fix-bracket-content'); if(!c) return;
+  var phases=['16avos','Octavos','Cuartos','Semis','Final'];
+  var pLabels={'16avos':'16avos de Final','Octavos':'Octavos de Final','Cuartos':'Cuartos de Final','Semis':'Semifinales','Final':'Final y 3er puesto'};
+  var h='';
+  phases.forEach(function(ph) {
+    var matches=AM.filter(function(m){return m.ph===ph;});
+    if(!matches.length)return;
+    var open=openPhases[ph];
+    h+='<div class="bracket-phase"><div class="bracket-phase-title">'+pLabels[ph]+'</div>';
+    if(!open){
+      h+='<div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;text-align:center;font-size:13px;color:var(--text3)">🔒 El admin habilitará esta fase cuando se conozcan los clasificados</div></div>';
+      return;
+    }
+    h+='<div class="bracket-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">';
+    matches.forEach(function(m) {
+      var played=m.homeScore!==null&&m.awayScore!==null;
+      var hw=played&&m.homeScore>m.awayScore, aw=played&&m.awayScore>m.homeScore;
+      h+='<div class="bracket-match'+(played?' played':'')+'">';
+      h+='<div>';
+      h+='<div class="bracket-team"><span class="bracket-team-name" style="font-size:12px;'+(hw?'color:var(--green)':'')+'">'+m.h+'</span><span class="bracket-score'+(hw?' winner':'')+'">'+( played?m.homeScore:'—')+'</span></div>';
+      h+='<div class="bracket-divider"></div>';
+      h+='<div class="bracket-team"><span class="bracket-team-name" style="font-size:12px;'+(aw?'color:var(--green)':'')+'">'+m.a+'</span><span class="bracket-score'+(aw?' winner':'')+'">'+( played?m.awayScore:'—')+'</span></div>';
+      h+='</div>';
+      h+='<div class="bracket-meta">'+fmtDate(m.d)+(played?'<br><span class="badge badge-green" style="font-size:10px">FIN</span>':isLocked(m.d)?'<br><span class="badge badge-amber" style="font-size:10px">EN CURSO</span>':'<br><span class="badge badge-blue" style="font-size:10px">PRÓXIMO</span>')+'</div>';
+      h+='</div>';
+    });
+    h+='</div></div>';
+  });
+  if(!h)h='<div class="empty">Las fases eliminatorias se mostrarán cuando el admin las habilite</div>';
+  c.innerHTML=h;
+}
+
 // NAV
 // ============================================================
 function showTab(tab) {
-  var tabs=['ranking','partidos','predicciones','comparar','pago','admin'];
+  var tabs=['ranking','partidos','predicciones','comparar','fixture','pago','admin'];
   tabs.forEach(function(t) {
     el('tab-'+t).style.display=t===tab?'block':'none';
     var nt=el('nt-'+t); if(nt)nt.classList.toggle('active',t===tab);
@@ -1164,6 +1378,7 @@ function showTab(tab) {
   if(tab==='partidos')renderMatches();
   if(tab==='predicciones')renderPredictions();
   if(tab==='comparar'){buildPhaseBtns('cpf',cPhase,'filterCPhase',true);renderCmpGroupFilter();renderCmpList();}
+  if(tab==='fixture')renderFixture();
   if(tab==='pago')renderPayTab();
   if(tab==='admin'){renderAdminPlayers();renderPhaseToggles();showChampionCurrent();}
 }
