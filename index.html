@@ -1083,20 +1083,8 @@ function renderPayTab() {
     if(isPaid) {
       ba.innerHTML='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:inline-block;font-size:13px;color:var(--text3)">✓ Pago ya realizado</div>';
     } else {
-      var ref='POLLA26-'+String(CU.id).slice(-6)+'-'+String(Date.now()).slice(-4);
-      ba.innerHTML='<div id="wompi-container"></div><div style="font-size:11px;color:var(--text3);margin-top:7px">Referencia: '+ref+'</div>';
-      var form=document.createElement('form');
-      var sc=document.createElement('script');
-      sc.src='https://checkout.wompi.co/widget.js';
-      sc.setAttribute('data-render','button');
-      sc.setAttribute('data-public-key',WOMPI_KEY);
-      sc.setAttribute('data-currency','COP');
-      sc.setAttribute('data-amount-in-cents',String(WOMPI_AMT));
-      sc.setAttribute('data-reference',ref);
-      sc.setAttribute('data-redirect-url',WOMPI_REDIR);
-      sc.setAttribute('data-customer-data:full-name',CU.name);
-      form.appendChild(sc);
-      el('wompi-container').appendChild(form);
+      ba.innerHTML='<a href="https://checkout.wompi.co/l/VPOS_VizwkZ" target="_blank" style="display:inline-flex;align-items:center;gap:10px;background:var(--green);color:#000;padding:12px 24px;border-radius:8px;font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:700;text-decoration:none;letter-spacing:.5px;transition:opacity .2s" onmouseover="this.style.opacity=0.85" onmouseout="this.style.opacity=1"><span style="font-size:18px">💳</span> PAGAR $70.000 CON WOMPI</a>'
+        +'<div style="margin-top:8px;font-size:11px;color:var(--text3)">Se abre la pasarela segura de Wompi en una nueva pestaña</div>';
     }
   }
   var pa=el('pay-prize-area');
