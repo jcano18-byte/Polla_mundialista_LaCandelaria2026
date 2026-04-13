@@ -1083,8 +1083,22 @@ function renderPayTab() {
     if(isPaid) {
       ba.innerHTML='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:inline-block;font-size:13px;color:var(--text3)">✓ Pago ya realizado</div>';
     } else {
-      ba.innerHTML='<a href="https://checkout.wompi.co/l/VPOS_VizwkZ" target="_blank" style="display:inline-flex;align-items:center;gap:10px;background:var(--green);color:#000;padding:12px 24px;border-radius:8px;font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:700;text-decoration:none;letter-spacing:.5px;transition:opacity .2s" onmouseover="this.style.opacity=0.85" onmouseout="this.style.opacity=1"><span style="font-size:18px">💳</span> PAGAR $70.000 CON WOMPI</a>'
-        +'<div style="margin-top:8px;font-size:11px;color:var(--text3)">Se abre la pasarela segura de Wompi en una nueva pestaña</div>';
+      var prev=document.getElementById('wompi-container');
+      if(prev)prev.remove();
+      var ref='POLLA26-'+CU.name.replace(/\s/g,'').slice(0,8).toUpperCase()+'-'+String(Date.now()).slice(-6);
+      ba.innerHTML='<div id="wompi-container"></div><div style="font-size:11px;color:var(--text3);margin-top:8px">Referencia: '+ref+'</div>';
+      var form=document.createElement('form');
+      var sc=document.createElement('script');
+      sc.src='https://checkout.wompi.co/widget.js';
+      sc.setAttribute('data-render','button');
+      sc.setAttribute('data-public-key','pub_prod_BaRb4R1NAyTkY4tIlqIcNJzldVlGGUwH');
+      sc.setAttribute('data-currency','COP');
+      sc.setAttribute('data-amount-in-cents','7000000');
+      sc.setAttribute('data-reference',ref);
+      sc.setAttribute('data-redirect-url','https://jcano18-byte.github.io/Polla_mundialista_LaCandelaria2026/');
+      sc.setAttribute('data-customer-data:full-name',CU.name);
+      form.appendChild(sc);
+      el('wompi-container').appendChild(form);
     }
   }
   var pa=el('pay-prize-area');
