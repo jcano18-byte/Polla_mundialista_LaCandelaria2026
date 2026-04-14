@@ -268,6 +268,7 @@ tr:hover td{background:var(--bg3)}
     <div class="nav-item" onclick="showTab('comparar')" id="nt-comparar">Ver pronósticos</div>
     <div class="nav-item" onclick="showTab('fixture')" id="nt-fixture">📊 Fixture</div>
     <div class="nav-item" onclick="showTab('pago')" id="nt-pago">💳 Mi pago</div>
+    <div class="nav-item" onclick="showTab('perfil')" id="nt-perfil">👤 Mi perfil</div>
     <div class="nav-item" onclick="showTab('admin')" id="nt-admin" style="display:none">⚙ Admin</div>
   </div>
   <div class="content">
@@ -318,6 +319,15 @@ tr:hover td{background:var(--bg3)}
         <button class="btn btn-green" style="max-width:220px" onclick="doSavePredictions()">Guardar pronósticos</button>
         <span id="pred-msg" style="font-size:13px;margin-left:10px;opacity:0;transition:opacity .3s"></span>
         <div id="pred-info" style="font-size:12px;color:var(--text3);margin-top:7px"></div>
+      <div id="pred-progress" style="margin-top:10px;display:none">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:12px;color:var(--text2)" id="pred-progress-label"></span>
+          <span style="font-size:12px;font-weight:600;color:var(--green)" id="pred-progress-pct"></span>
+        </div>
+        <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+          <div id="pred-progress-bar" style="height:100%;background:var(--green);border-radius:3px;transition:width .4s"></div>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -379,6 +389,30 @@ tr:hover td{background:var(--bg3)}
       <div class="card">
         <div class="card-title" style="color:var(--amber)">🏆 Premio estimado</div>
         <div id="pay-prize-area"></div>
+      </div>
+    </div>
+
+    <!-- PERFIL -->
+    <div id="tab-perfil" style="display:none">
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">👤 Mi perfil</div>
+        <div id="perfil-info" style="margin-bottom:1rem"></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">🔑 Cambiar PIN</div>
+        <div class="form-group"><label>PIN actual</label><input type="password" id="cp-old" placeholder="Tu PIN actual" maxlength="8"></div>
+        <div class="form-group">
+          <label>Nuevo PIN</label>
+          <input type="password" id="cp-new1" placeholder="Mínimo 4 caracteres" maxlength="8" oninput="checkCpStrength()">
+          <div style="height:4px;border-radius:2px;margin-top:5px;background:var(--bg3);transition:all .3s;width:0" id="cp-strength"></div>
+        </div>
+        <div class="form-group"><label>Confirmar nuevo PIN</label><input type="password" id="cp-new2" placeholder="Repite el nuevo PIN" maxlength="8"></div>
+        <button class="btn btn-green" style="max-width:200px;margin-top:4px" onclick="doChangePin()">Cambiar PIN</button>
+        <div id="cp-msg" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Mis estadísticas</div>
+        <div id="perfil-stats"></div>
       </div>
     </div>
 
@@ -680,6 +714,7 @@ function startApp() {
   if (isAdmin) { b.textContent='Admin'; b.className='role-badge role-admin'; }
   else { b.textContent='Jugador'; b.className='role-badge role-player'; }
   document.getElementById('nt-admin').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('nt-perfil').style.display = isAdmin ? 'none' : 'flex';
   loadData();
   showTab('ranking');
   // Auto-refresh every 5 minutes
@@ -968,6 +1003,7 @@ function renderPredictions() {
 
   listEl.innerHTML=html;
   el('pred-save-area').style.display='block';
+  updatePredProgress();
   el('pred-info').textContent=openCount>0?(openCount+' partido'+(openCount!==1?'s':'')+' abierto'+(openCount!==1?'s':'')+' — guarda cuando quieras, puedes completar después'):'Todos los partidos de esta fase están cerrados';
 }
 
@@ -1398,10 +1434,140 @@ function renderFixBracket() {
   c.innerHTML=h;
 }
 
+// ============================================================
+// PERFIL - CAMBIAR PIN + ESTADÍSTICAS
+// ============================================================
+function renderPerfil() {
+  if (!CU || isAdmin) return;
+  var s = calcStats(CU.id);
+
+  // Info card
+  var pi = el('perfil-info');
+  if (pi) {
+    var player = AP.find(function(p){return p.id==CU.id;}) || {};
+    var paid = !!paidPlayers[CU.id];
+    pi.innerHTML =
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
+      +'<div style="width:50px;height:50px;border-radius:50%;background:var(--blue-bg);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;font-family:Barlow Condensed,sans-serif;flex-shrink:0">'+CU.name.slice(0,2).toUpperCase()+'</div>'
+      +'<div><div style="font-size:17px;font-weight:600;color:var(--text)">'+CU.name+'</div>'
+      +'<div style="font-size:12px;color:var(--text2)">'+(player.team||'Sin equipo favorito')+'</div>'
+      +'<div style="margin-top:4px">'+(paid?'<span class="badge badge-green">✓ Pago confirmado</span>':'<span class="badge badge-red">⚠ Pago pendiente</span>')+'</div>'
+      +'</div></div>';
+  }
+
+  // Stats
+  var ps = el('perfil-stats');
+  if (ps) {
+    var myP = APreds[CU.id] || {};
+    var total = AM.length;
+    var pronosticados = Object.keys(myP).length;
+    var abiertos = AM.filter(function(m){return !isLocked(m.d);}).length;
+    var cerrados = AM.filter(function(m){return isLocked(m.d);}).length;
+
+    // Stats by phase
+    var byPhase = {};
+    PHASES.forEach(function(ph){byPhase[ph]={tot:0,ex:0,par:0,wr:0,pend:0,cnt:0};});
+    AM.forEach(function(m) {
+      var p = myP[m.id]; if(!p) return;
+      var ph = byPhase[m.ph]; if(!ph) return;
+      ph.cnt++;
+      var pt = calcPts(p.home,p.away,m.homeScore,m.awayScore);
+      if(pt===null){ph.pend++;return;}
+      ph.tot+=pt;
+      if(pt===5)ph.ex++; else if(pt>=2)ph.par++; else ph.wr++;
+    });
+
+    var h = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem">'
+      +'<div style="background:var(--bg3);border-radius:var(--radius);padding:.875rem;text-align:center"><div style="font-size:11px;color:var(--text3);margin-bottom:3px;text-transform:uppercase">Puntos totales</div><div style="font-size:26px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:var(--green)">'+s.tot+'</div></div>'
+      +'<div style="background:var(--bg3);border-radius:var(--radius);padding:.875rem;text-align:center"><div style="font-size:11px;color:var(--text3);margin-bottom:3px;text-transform:uppercase">Pronósticos</div><div style="font-size:26px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:#fff">'+pronosticados+'/'+total+'</div></div>'
+      +'<div style="background:var(--bg3);border-radius:var(--radius);padding:.875rem;text-align:center"><div style="font-size:11px;color:var(--text3);margin-bottom:3px;text-transform:uppercase">Exactos 🎯</div><div style="font-size:26px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:var(--green)">'+s.ex+'</div></div>'
+      +'<div style="background:var(--bg3);border-radius:var(--radius);padding:.875rem;text-align:center"><div style="font-size:11px;color:var(--text3);margin-bottom:3px;text-transform:uppercase">Parciales</div><div style="font-size:26px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:var(--amber)">'+s.par+'</div></div>'
+      +'</div>';
+
+    // Progress bar overall
+    var pct = total>0?Math.round(pronosticados/total*100):0;
+    h += '<div style="margin-bottom:1rem"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:12px;color:var(--text2)">Progreso general</span><span style="font-size:12px;font-weight:600;color:var(--green)">'+pct+'%</span></div><div style="height:8px;background:var(--bg3);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--green);border-radius:4px;transition:width .4s"></div></div></div>';
+
+    // Stats by phase
+    h += '<div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Por fase</div>';
+    h += '<div style="display:grid;gap:6px">';
+    PHASES.forEach(function(ph) {
+      var phData = byPhase[ph];
+      if (!phData || phData.cnt === 0) return;
+      var phPct = phData.cnt>0?Math.round(phData.tot/((phData.cnt-phData.pend)*5||1)*100):0;
+      h += '<div style="background:var(--bg3);border-radius:var(--radius);padding:10px 12px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        +'<span style="font-size:13px;font-weight:500">'+PHASE_LABELS[ph]+'</span>'
+        +'<span style="font-size:13px;font-weight:700;color:var(--green)">'+phData.tot+' pts</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px;font-size:11px">'
+        +'<span style="color:var(--green)">'+phData.ex+' exactos</span>'
+        +'<span style="color:var(--amber)">'+phData.par+' parciales</span>'
+        +'<span style="color:var(--red)">'+phData.wr+' fallidos</span>'
+        +'</div>'
+        +'</div>';
+    });
+    h += '</div>';
+    ps.innerHTML = h;
+  }
+}
+
+function checkCpStrength() {
+  var p = el('cp-new1').value;
+  var b = el('cp-strength');
+  if (!b) return;
+  if (!p){b.style.width='0';return;}
+  if(p.length<4){b.style.width='25%';b.style.background='var(--red)';}
+  else if(p.length<6){b.style.width='55%';b.style.background='var(--amber)';}
+  else{b.style.width='100%';b.style.background='var(--green)';}
+}
+
+function doChangePin() {
+  var old1=el('cp-old').value.trim();
+  var np1=el('cp-new1').value.trim();
+  var np2=el('cp-new2').value.trim();
+  var msgEl=el('cp-msg');
+  msgEl.innerHTML='';
+  if(!old1||!np1||!np2){msgEl.innerHTML='<div class="alert alert-error">Completa todos los campos</div>';return;}
+  if(np1.length<4){msgEl.innerHTML='<div class="alert alert-error">Mínimo 4 caracteres</div>';return;}
+  if(np1!==np2){msgEl.innerHTML='<div class="alert alert-error">Los PINs no coinciden</div>';return;}
+  if(np1===old1){msgEl.innerHTML='<div class="alert alert-error">El nuevo PIN debe ser diferente</div>';return;}
+  msgEl.innerHTML='<div class="alert alert-info">Guardando...</div>';
+  apiPost('changePin',{playerId:CU.id,oldPin:old1,newPin:np1}).then(function(r){
+    if(r.ok){
+      msgEl.innerHTML='<div class="alert alert-success">✓ PIN actualizado correctamente</div>';
+      el('cp-old').value=''; el('cp-new1').value=''; el('cp-new2').value='';
+      var b=el('cp-strength'); if(b)b.style.width='0';
+    } else msgEl.innerHTML='<div class="alert alert-error">'+(r.msg||'Error al cambiar PIN')+'</div>';
+    setTimeout(function(){msgEl.innerHTML='';},4000);
+  }).catch(function(){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';});
+}
+
+// Update prediction progress bar
+function updatePredProgress() {
+  if (!CU) return;
+  var myP = APreds[CU.id] || {};
+  var f = AM.filter(function(m){return m.ph===pPhase;});
+  var open = f.filter(function(m){return !isLocked(m.d);});
+  var pronost = f.filter(function(m){
+    var p=myP[m.id];
+    return p&&p.home!==null&&p.home!==undefined&&p.away!==null&&p.away!==undefined;
+  });
+  var total = f.length;
+  var done = pronost.length;
+  var pct = total>0?Math.round(done/total*100):0;
+  var pp=el('pred-progress'), lbl=el('pred-progress-label'), pctEl=el('pred-progress-pct'), bar=el('pred-progress-bar');
+  if(!pp)return;
+  pp.style.display='block';
+  if(lbl)lbl.textContent=done+' de '+total+' partidos pronosticados en esta fase';
+  if(pctEl)pctEl.textContent=pct+'%';
+  if(bar)bar.style.width=pct+'%';
+}
+
 // NAV
 // ============================================================
 function showTab(tab) {
-  var tabs=['ranking','partidos','predicciones','comparar','fixture','pago','admin'];
+  var tabs=['ranking','partidos','predicciones','comparar','fixture','pago','perfil','admin'];
   tabs.forEach(function(t) {
     el('tab-'+t).style.display=t===tab?'block':'none';
     var nt=el('nt-'+t); if(nt)nt.classList.toggle('active',t===tab);
@@ -1410,6 +1576,7 @@ function showTab(tab) {
   if(tab==='predicciones')renderPredictions();
   if(tab==='comparar'){buildPhaseBtns('cpf',cPhase,'filterCPhase',true);renderCmpGroupFilter();renderCmpList();}
   if(tab==='fixture')renderFixture();
+  if(tab==='perfil')renderPerfil();
   if(tab==='pago')renderPayTab();
   if(tab==='admin'){renderAdminPlayers();renderPhaseToggles();showChampionCurrent();}
 }
