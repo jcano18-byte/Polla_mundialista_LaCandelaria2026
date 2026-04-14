@@ -256,6 +256,7 @@ tr:hover td{background:var(--bg3)}
       <span class="role-badge role-player" id="role-badge">Jugador</span>
     </div>
     <div class="flex">
+      <span style="font-size:11px;color:var(--text3)" id="last-updated-chip"></span>
       <span style="font-size:13px;color:var(--text2)" id="user-chip"></span>
       <button class="logout-btn" onclick="doLogout()">Salir</button>
     </div>
@@ -566,6 +567,7 @@ var BM = [
 // STATE
 // ============================================================
 var CU = null, isAdmin = false, pendingLogin = null, adminToken = null;
+var groupStandings = {}, knockoutNames = {}, lastUpdated = null;
 var AM = [], AP = [], APreds = {}, paidPlayers = {}, champion = null;
 var PP = {}, selPlayers = {};
 var openPhases = {Grupos:true,'16avos':false,Octavos:false,Cuartos:false,Semis:false,Final:false};
@@ -680,6 +682,10 @@ function startApp() {
   document.getElementById('nt-admin').style.display = isAdmin ? 'flex' : 'none';
   loadData();
   showTab('ranking');
+  // Auto-refresh every 5 minutes
+  setInterval(function(){
+    loadData();
+  }, 5 * 60 * 1000);
 }
 
 function doLogout() {
@@ -713,10 +719,20 @@ function loadData() {
     APreds = r.predictions||{};
     paidPlayers = r.paidPlayers||{};
     champion = r.champion||null;
+    groupStandings = r.groupStandings||{};
+    knockoutNames = r.knockoutNames||{};
+    lastUpdated = r.lastUpdated||null;
     if (r.openPhases) Object.keys(r.openPhases).forEach(function(k){openPhases[k]=r.openPhases[k];});
     AM = BM.map(function(m) {
       var s = (r.matches||[]).find(function(x){return x.id==m.id;});
-      return s ? Object.assign({},m,s) : Object.assign({},m,{homeScore:null,awayScore:null});
+      var base = s ? Object.assign({},m,s) : Object.assign({},m,{homeScore:null,awayScore:null});
+      // Apply knockout team names from API if available
+      var kn = (r.knockoutNames||{})[m.id];
+      if (kn) {
+        if (kn.home) base.h = kn.home;
+        if (kn.away) base.a = kn.away;
+      }
+      return base;
     });
     renderRanking(); renderMatches(); renderPredictions(); renderCmpChips();
     if (isAdmin) { renderAdminPlayers(); renderPhaseToggles(); showChampionCurrent(); }
@@ -782,6 +798,13 @@ function el(id){return document.getElementById(id);}
 // RANKING
 // ============================================================
 function renderRanking() {
+  // Show last updated
+  var lu = el('last-updated-chip');
+  if (lu && lastUpdated) {
+    var d = new Date(lastUpdated);
+    lu.textContent = '⟳ ' + d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    lu.title = 'Última actualización: ' + d.toLocaleString('es-CO');
+  }
   var played=AM.filter(function(m){return m.homeScore!==null&&m.awayScore!==null;}).length;
   el('m-players').textContent=AP.length;
   el('m-played').textContent=played;
@@ -1298,25 +1321,34 @@ function selectFixTableGroup(g) { fixTableGroupSel=g; renderFixTableGroupFilter(
 function renderFixTable() {
   var c = el('fix-table-content'); if(!c) return;
   var g = fixTableGroupSel;
-  var teams={};
-  BM.filter(function(m){return m.ph==='Grupos'&&m.gr===g;}).forEach(function(m) {
-    if(!teams[m.h]) teams[m.h]={name:m.h,pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0};
-    if(!teams[m.a]) teams[m.a]={name:m.a,pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0};
-    var match=AM.find(function(x){return x.id===m.id;});
-    if(!match||match.homeScore===null) return;
-    var hs=match.homeScore, as=match.awayScore;
-    teams[m.h].pj++; teams[m.h].gf+=hs; teams[m.h].gc+=as;
-    teams[m.a].pj++; teams[m.a].gf+=as; teams[m.a].gc+=hs;
-    if(hs>as){teams[m.h].pg++;teams[m.h].pts+=3;teams[m.a].pp++;}
-    else if(as>hs){teams[m.a].pg++;teams[m.a].pts+=3;teams[m.h].pp++;}
-    else{teams[m.h].pe++;teams[m.h].pts+=1;teams[m.a].pe++;teams[m.a].pts+=1;}
-  });
-  var rows=Object.values(teams);
-  rows.sort(function(a,b){
-    if(b.pts!==a.pts)return b.pts-a.pts;
-    if((b.gf-b.gc)!==(a.gf-a.gc))return(b.gf-b.gc)-(a.gf-a.gc);
-    return b.gf-a.gf;
-  });
+
+  // Use API standings if available (more accurate with tiebreakers)
+  var apiStandings = groupStandings[g];
+  var rows;
+  if (apiStandings && apiStandings.length > 0 && apiStandings[0].pj > 0) {
+    rows = apiStandings;
+  } else {
+    // Fallback: calculate from our match results
+    var teams={};
+    BM.filter(function(m){return m.ph==='Grupos'&&m.gr===g;}).forEach(function(m) {
+      if(!teams[m.h]) teams[m.h]={name:m.h,pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0};
+      if(!teams[m.a]) teams[m.a]={name:m.a,pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0};
+      var match=AM.find(function(x){return x.id===m.id;});
+      if(!match||match.homeScore===null) return;
+      var hs=match.homeScore, as=match.awayScore;
+      teams[m.h].pj++; teams[m.h].gf+=hs; teams[m.h].gc+=as;
+      teams[m.a].pj++; teams[m.a].gf+=as; teams[m.a].gc+=hs;
+      if(hs>as){teams[m.h].pg++;teams[m.h].pts+=3;teams[m.a].pp++;}
+      else if(as>hs){teams[m.a].pg++;teams[m.a].pts+=3;teams[m.h].pp++;}
+      else{teams[m.h].pe++;teams[m.h].pts+=1;teams[m.a].pe++;teams[m.a].pts+=1;}
+    });
+    rows=Object.values(teams);
+    rows.sort(function(a,b){
+      if(b.pts!==a.pts)return b.pts-a.pts;
+      if((b.gf-b.gc)!==(a.gf-a.gc))return(b.gf-b.gc)-(a.gf-a.gc);
+      return b.gf-a.gf;
+    });
+  }
   var h='<div class="card"><div class="card-title">Grupo '+g+'</div><div class="table-wrap"><table class="standings-table">';
   h+='<thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th></tr></thead><tbody>';
   rows.forEach(function(t,i) {
