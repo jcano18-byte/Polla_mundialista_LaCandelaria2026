@@ -272,6 +272,7 @@ tr:hover td{background:var(--bg3)}
     <div class="nav-item" onclick="showTab('admin')" id="nt-admin" style="display:none">⚙ Admin</div>
   </div>
   <div class="content">
+    <div id="upcoming-warning" style="display:none;margin-bottom:12px"></div>
 
     <!-- RANKING -->
     <div id="tab-ranking">
@@ -299,6 +300,12 @@ tr:hover td{background:var(--bg3)}
           <div style="background:var(--bg3);border-radius:var(--radius);padding:10px"><div style="font-size:20px;font-weight:700;color:var(--blue);font-family:'Barlow Condensed',sans-serif">2 pts</div><div style="font-size:12px;color:var(--text2)">Solo ganador o empate</div></div>
           <div style="background:var(--bg3);border-radius:var(--radius);padding:10px"><div style="font-size:20px;font-weight:700;color:var(--text3);font-family:'Barlow Condensed',sans-serif">0 pts</div><div style="font-size:12px;color:var(--text2)">Pronóstico incorrecto</div></div>
           <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:10px;grid-column:span 2"><div style="font-size:20px;font-weight:700;color:var(--amber);font-family:'Barlow Condensed',sans-serif">+10 pts 🏆</div><div style="font-size:12px;color:var(--text2)">Tu equipo favorito gana el Mundial</div></div>
+        </div>
+        <div style="margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:var(--radius);font-size:12px;color:var(--text3);line-height:1.7">
+          <strong style="color:var(--text2)">⚖️ Criterios de desempate</strong><br>
+          En caso de empate en puntos se aplica en orden:<br>
+          1. Más pronósticos exactos · 2. Más pronósticos parciales · 3. Menos fallidos<br>
+          Si persiste el empate, el premio se divide entre los empatados.
         </div>
       </div>
     </div>
@@ -721,6 +728,10 @@ function startApp() {
   setInterval(function(){
     loadData();
   }, 5 * 60 * 1000);
+  // Check upcoming matches every minute
+  setInterval(function(){
+    checkUpcomingMatches();
+  }, 60 * 1000);
 }
 
 function doLogout() {
@@ -770,6 +781,7 @@ function loadData() {
       return base;
     });
     renderRanking(); renderMatches(); renderPredictions(); renderCmpChips();
+    checkUpcomingMatches();
     if (isAdmin) { renderAdminPlayers(); renderPhaseToggles(); showChampionCurrent(); }
   }).catch(function(e){ console.error('loadData error',e); });
 }
@@ -798,6 +810,7 @@ function calcStats(pid) {
   var plr=AP.find(function(p){return p.id==pid;});
   var bonus=(champion&&plr&&plr.team&&plr.team.toLowerCase()===champion.toLowerCase())?10:0;
   tot+=bonus;
+  // Tiebreaker criteria: 1) total pts, 2) exactos, 3) parciales, 4) menos fallidos
   return {tot:tot,ex:ex,par:par,wr:wr,pen:pen,cnt:Object.keys(pr).length,bonus:bonus};
 }
 
@@ -845,7 +858,12 @@ function renderRanking() {
   el('m-played').textContent=played;
   el('m-pending').textContent=AM.length-played;
   var rows=AP.map(function(p){return Object.assign({},p,calcStats(p.id));});
-  rows.sort(function(a,b){return b.tot-a.tot||b.ex-a.ex;});
+  rows.sort(function(a,b){
+    if(b.tot!==a.tot) return b.tot-a.tot;       // 1. Puntos totales
+    if(b.ex!==a.ex)   return b.ex-a.ex;          // 2. Más exactos
+    if(b.par!==a.par) return b.par-a.par;        // 3. Más parciales
+    return a.wr-b.wr;                             // 4. Menos fallidos
+  });
   var myPos=rows.findIndex(function(r){return r.id==CU.id;});
   el('m-mypos').textContent=myPos>=0?'#'+(myPos+1):'—';
 
@@ -877,7 +895,7 @@ function renderRanking() {
     var me=r.id==CU.id;
     th+='<tr style="'+(me?'background:rgba(34,197,94,.04)':'')+'">';
     th+='<td style="font-weight:700;font-family:Barlow Condensed,sans-serif;font-size:17px;color:'+pc+'">'+(i+1)+'</td>';
-    th+='<td><div class="flex"><div class="avatar" style="'+(i===0?'background:rgba(245,158,11,.15);color:var(--amber)':'')+'">'+r.name.slice(0,2).toUpperCase()+'</div><div><div style="font-weight:500">'+r.name+(me?' <span style="font-size:11px;color:var(--green)">(tú)</span>':'')+'</div><div style="font-size:11px;color:var(--text3)">'+(r.team||'')+'</div></div></div></td>';
+    th+='<td><div class="flex" style="cursor:pointer" data-pid="'+r.id+'" onclick="openPlayerModal(this.dataset.pid)"><div class="avatar" style="'+(i===0?'background:rgba(245,158,11,.15);color:var(--amber)':'')+'">'+r.name.slice(0,2).toUpperCase()+'</div><div><div style="font-weight:500">'+r.name+(me?' <span style="font-size:11px;color:var(--green)">(tú)</span>':'')+'</div><div style="font-size:11px;color:var(--text3)">'+(r.team||'')+'</div></div></div></td>';
     th+='<td><strong style="font-size:15px;font-family:Barlow Condensed,sans-serif">'+r.tot+'</strong>'+(r.bonus>0?'<span style="font-size:11px;color:var(--amber);margin-left:3px">+10🏆</span>':'')+'</td>';
     th+='<td><span class="badge badge-green">'+r.ex+'</span></td>';
     th+='<td><span class="badge badge-amber">'+r.par+'</span></td>';
@@ -1564,6 +1582,96 @@ function updatePredProgress() {
   if(bar)bar.style.width=pct+'%';
 }
 
+// ============================================================
+// PLAYER MODAL - click name in ranking to see details
+// ============================================================
+function openPlayerModal(pid) {
+  var player = AP.find(function(p){return p.id==pid;});
+  if (!player) return;
+  var s = calcStats(pid);
+  var myP = APreds[pid] || {};
+  var isMe = CU && pid == CU.id;
+
+  el('modal-name').innerHTML = (isMe?'⭐ ':'')+player.name
+    +'<span style="font-size:13px;font-weight:400;color:var(--text2);margin-left:8px">'+(player.team||'')+'</span>';
+
+  // Stats grid
+  var h = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">'
+    +'<div style="background:var(--bg3);border-radius:var(--radius);padding:.75rem;text-align:center"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:2px">Puntos</div><div style="font-size:22px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:var(--green)">'+s.tot+'</div></div>'
+    +'<div style="background:var(--bg3);border-radius:var(--radius);padding:.75rem;text-align:center"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:2px">Exactos</div><div style="font-size:22px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:var(--green)">'+s.ex+'</div></div>'
+    +'<div style="background:var(--bg3);border-radius:var(--radius);padding:.75rem;text-align:center"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:2px">Parciales</div><div style="font-size:22px;font-weight:700;font-family:Barlow Condensed,sans-serif;color:var(--amber)">'+s.par+'</div></div>'
+    +'</div>';
+
+  // Recent predictions (last 10 played matches)
+  var played = AM.filter(function(m){return m.homeScore!==null&&m.awayScore!==null;}).slice(-10).reverse();
+  if (played.length) {
+    h += '<div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Últimos partidos</div>';
+    h += '<div style="display:grid;gap:5px">';
+    played.forEach(function(m) {
+      var p = myP[m.id];
+      var pt = p ? calcPts(p.home,p.away,m.homeScore,m.awayScore) : null;
+      var ptColor = pt===5?'var(--green)':pt>=2?'var(--amber)':pt===0?'var(--red)':'var(--text3)';
+      var ptBg = pt===5?'var(--green-bg)':pt>=2?'var(--amber-bg)':pt===0?'var(--red-bg)':'var(--bg4)';
+      h += '<div style="background:var(--bg3);border-radius:8px;padding:8px 10px;display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">'
+        +'<div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+m.h+' <span style="color:var(--text3)">'+m.homeScore+'-'+m.awayScore+'</span> '+m.a+'</div>'
+        +'<div style="font-size:12px;color:var(--text3)">'+(p&&p.home!==null?p.home+'-'+p.away:'—')+'</div>'
+        +'<div style="background:'+ptBg+';color:'+ptColor+';padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700;min-width:24px;text-align:center">'+(pt!==null?pt+'p':'?')+'</div>'
+        +'</div>';
+    });
+    h += '</div>';
+  } else {
+    h += '<div style="text-align:center;color:var(--text3);font-size:13px;padding:1rem">No hay partidos jugados aún</div>';
+  }
+
+  el('modal-content').innerHTML = h;
+  var modal = el('player-modal');
+  modal.style.display = 'flex';
+  modal.onclick = function(e){if(e.target===modal)closePlayerModal();};
+}
+
+function closePlayerModal() {
+  el('player-modal').style.display = 'none';
+}
+
+// ============================================================
+// UPCOMING MATCH NOTIFICATIONS
+// ============================================================
+function checkUpcomingMatches() {
+  if (!CU || isAdmin) return;
+  var myP = APreds[CU.id] || {};
+  var now = new Date();
+  var warnings = [];
+  AM.forEach(function(m) {
+    if (isLocked(m.d)) return; // already locked
+    var deadline = getDeadline(m.d);
+    var minLeft = Math.round((deadline - now) / 60000);
+    if (minLeft > 0 && minLeft <= 120) { // within 2 hours
+      var p = myP[m.id];
+      var hasPred = p && p.home !== null && p.home !== undefined && p.away !== null && p.away !== undefined;
+      if (!hasPred) {
+        warnings.push({match: m, minLeft: minLeft});
+      }
+    }
+  });
+
+  var banner = el('upcoming-warning');
+  if (!banner) return;
+  if (warnings.length > 0) {
+    var msg = warnings.length === 1
+      ? '⏰ El partido <strong>'+warnings[0].match.h+' vs '+warnings[0].match.a+'</strong> cierra en <strong>'+warnings[0].minLeft+' min</strong> — aún no tienes pronóstico'
+      : '⏰ <strong>'+warnings.length+' partidos</strong> cierran en las próximas 2 horas sin pronóstico tuyo';
+    var div=document.createElement('div');
+    div.style.cssText='background:rgba(239,68,68,.12);border:1px solid var(--red);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);cursor:pointer';
+    div.innerHTML=msg+' — <u>ir a pronosticar</u>';
+    div.onclick=function(){showTab('predicciones');};
+    banner.innerHTML='';
+    banner.appendChild(div);
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
 // NAV
 // ============================================================
 function showTab(tab) {
@@ -1581,5 +1689,16 @@ function showTab(tab) {
   if(tab==='admin'){renderAdminPlayers();renderPhaseToggles();showChampionCurrent();}
 }
 </script>
+<!-- PLAYER MODAL -->
+<div id="player-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);width:100%;max-width:480px;max-height:85vh;overflow-y:auto">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700" id="modal-name"></div>
+      <button onclick="closePlayerModal()" style="background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:20px;line-height:1">×</button>
+    </div>
+    <div style="padding:1rem 1.25rem" id="modal-content"></div>
+  </div>
+</div>
+
 </body>
 </html>
