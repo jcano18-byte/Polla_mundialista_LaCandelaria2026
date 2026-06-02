@@ -1,0 +1,12 @@
+# Apps Script local copy — contiene ADMIN_PASSWORD y API keys en texto plano
+Code.gs
+
+# Editores / SO
+.vscode/
+.idea/
+*.swp
+*.bak
+*~
+Thumbs.db
+desktop.ini
+.DS_Store
