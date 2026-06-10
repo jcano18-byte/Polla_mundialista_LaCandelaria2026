@@ -931,7 +931,7 @@ function showCurrentChampion(){
 function renderPrizes(){
   const el=document.getElementById('prize-calc');
   if(!el)return;
-  const n=AP.length;
+  const n=Object.keys(paidPlayers).length;
   const total=n*70000;
   const p1=Math.floor(total*0.75);
   const p2=total-p1;
@@ -1002,7 +1002,7 @@ function renderPayTab(){
   }
   const prizeEl=document.getElementById('pay-prize-preview');
   if(prizeEl){
-    const n=AP.length,total=n*70000,p1=Math.floor(total*.75),p2=total-p1;
+    const n=Object.keys(paidPlayers).length,total=n*70000,p1=Math.floor(total*.75),p2=total-p1;
     prizeEl.innerHTML='<div style="display:flex;gap:8px">'
       +'<div style="flex:1;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:12px;text-align:center">'
       +'<div style="font-size:11px;color:var(--amber);margin-bottom:2px;text-transform:uppercase">🥇 Primer puesto</div>'
