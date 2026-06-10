@@ -295,7 +295,7 @@ const WOMPI_REDIRECT = 'https://jcano18-byte.github.io/Polla_mundialista_LaCande
     <div id="tab-comparar" style="display:none">
       <div class="card" style="margin-bottom:1rem">
         <div class="card-title">Participantes a comparar</div>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Solo se muestran pronósticos de partidos ya jugados — no se pueden ver pronósticos de partidos futuros.</p>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Los pronósticos de otros jugadores se revelan 10 minutos después del inicio de cada partido (previene trampas).</p>
         <div class="player-selector" id="compare-chips"></div>
       </div>
       <div class="phase-filter" id="compare-phase-filter"></div>
@@ -791,10 +791,10 @@ function renderCompareGroupFilter(){
 function renderCompareList(){
   const el=document.getElementById('compare-list');
   if(!selPlayers.size){el.innerHTML='<div class="empty">Selecciona participantes para comparar sus pronósticos</div>';return}
-  // SOLO partidos ya bloqueados (anti-trampa: deadline medianoche COL)
+  // SOLO partidos a los que ya pasaron 10 minutos de iniciados (anti-trampa)
   let f=AM.filter(m=>m.phase===cPhase&&isMatchLocked(m.date));
   if(cPhase==='Grupos'&&cGroup!=='Todos')f=f.filter(m=>m.group===cGroup);
-  if(!f.length){el.innerHTML='<div class="empty">No hay partidos jugados en esta fase aún. Los pronósticos se revelan después del pitazo inicial.</div>';return}
+  if(!f.length){el.innerHTML='<div class="empty">No hay partidos en esta fase aún. Los pronósticos se revelan 10 minutos después de iniciado cada partido (anti-trampa).</div>';return}
   const selList=AP.filter(p=>selPlayers.has(p.id.toString()));
   el.innerHTML=f.map(m=>{
     const played=m.homeScore!==null&&m.awayScore!==null;
@@ -931,7 +931,7 @@ function showCurrentChampion(){
 function renderPrizes(){
   const el=document.getElementById('prize-calc');
   if(!el)return;
-  const n=AP.length;
+  const n=Object.keys(paidPlayers).length;
   const total=n*70000;
   const p1=Math.floor(total*0.75);
   const p2=total-p1;
@@ -1002,7 +1002,7 @@ function renderPayTab(){
   }
   const prizeEl=document.getElementById('pay-prize-preview');
   if(prizeEl){
-    const n=AP.length,total=n*70000,p1=Math.floor(total*.75),p2=total-p1;
+    const n=Object.keys(paidPlayers).length,total=n*70000,p1=Math.floor(total*.75),p2=total-p1;
     prizeEl.innerHTML='<div style="display:flex;gap:8px">'
       +'<div style="flex:1;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:12px;text-align:center">'
       +'<div style="font-size:11px;color:var(--amber);margin-bottom:2px;text-transform:uppercase">🥇 Primer puesto</div>'
@@ -1031,7 +1031,9 @@ function getDeadline(dateStr){
 }
 
 function isMatchLocked(dateStr){
-  return new Date() >= getDeadline(dateStr);
+  const matchTime = new Date(dateStr + ':00-05:00');
+  const tenMinutesAfter = new Date(matchTime.getTime() + 10*60*1000);
+  return new Date() >= tenMinutesAfter;
 }
 
 function buildPhaseButtons(containerId, currentPhase, onClickFn, showAll){
