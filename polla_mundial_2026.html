@@ -1031,7 +1031,9 @@ function getDeadline(dateStr){
 }
 
 function isMatchLocked(dateStr){
-  return new Date() >= getDeadline(dateStr);
+  const matchTime = new Date(dateStr + ':00-05:00');
+  const fiveMinutesBefore = new Date(matchTime.getTime() - 5*60*1000);
+  return new Date() >= fiveMinutesBefore;
 }
 
 function buildPhaseButtons(containerId, currentPhase, onClickFn, showAll){
