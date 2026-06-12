@@ -295,7 +295,7 @@ const WOMPI_REDIRECT = 'https://jcano18-byte.github.io/Polla_mundialista_LaCande
     <div id="tab-comparar" style="display:none">
       <div class="card" style="margin-bottom:1rem">
         <div class="card-title">Participantes a comparar</div>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Los pronósticos de otros jugadores se revelan 10 minutos después del inicio de cada partido (previene trampas).</p>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Los pronósticos de otros jugadores se revelan 5 minutos antes de cada partido (transparencia total).</p>
         <div class="player-selector" id="compare-chips"></div>
       </div>
       <div class="phase-filter" id="compare-phase-filter"></div>
@@ -791,10 +791,10 @@ function renderCompareGroupFilter(){
 function renderCompareList(){
   const el=document.getElementById('compare-list');
   if(!selPlayers.size){el.innerHTML='<div class="empty">Selecciona participantes para comparar sus pronósticos</div>';return}
-  // SOLO partidos a los que ya pasaron 10 minutos de iniciados (anti-trampa)
+  // SOLO partidos que ya pasaron 5 min antes del inicio (transparencia)
   let f=AM.filter(m=>m.phase===cPhase&&isMatchLocked(m.date));
   if(cPhase==='Grupos'&&cGroup!=='Todos')f=f.filter(m=>m.group===cGroup);
-  if(!f.length){el.innerHTML='<div class="empty">No hay partidos en esta fase aún. Los pronósticos se revelan 10 minutos después de iniciado cada partido (anti-trampa).</div>';return}
+  if(!f.length){el.innerHTML='<div class="empty">No hay partidos disponibles aún. Los pronósticos se revelan 5 minutos antes de cada partido (transparencia).</div>';return}
   const selList=AP.filter(p=>selPlayers.has(p.id.toString()));
   el.innerHTML=f.map(m=>{
     const played=m.homeScore!==null&&m.awayScore!==null;
@@ -1032,8 +1032,8 @@ function getDeadline(dateStr){
 
 function isMatchLocked(dateStr){
   const matchTime = new Date(dateStr + ':00-05:00');
-  const tenMinutesAfter = new Date(matchTime.getTime() + 10*60*1000);
-  return new Date() >= tenMinutesAfter;
+  const fiveMinutesBefore = new Date(matchTime.getTime() - 5*60*1000);
+  return new Date() >= fiveMinutesBefore;
 }
 
 function buildPhaseButtons(containerId, currentPhase, onClickFn, showAll){
