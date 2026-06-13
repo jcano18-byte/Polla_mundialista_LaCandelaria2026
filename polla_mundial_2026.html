@@ -27,7 +27,7 @@ h1,h2,h3{font-family:'Barlow Condensed',sans-serif}
 .login-logo h1{font-size:28px;font-weight:700;color:#fff}
 .login-logo p{font-size:13px;color:var(--text2);margin-top:4px}
 .login-tabs{display:flex;gap:4px;margin-bottom:1.5rem;background:var(--bg3);border-radius:8px;padding:4px}
-.login-tab{flex:1;padding:8px;text-align:center;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .2s}
+.login-tab{flex:1;padding:8px;text-align:center;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .2s;border:none;background:transparent;font-family:inherit;touch-action:manipulation}
 .login-tab.active{background:var(--bg4);color:var(--text)}
 .form-group{margin-bottom:14px}
 .form-group label{font-size:12px;color:var(--text3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
@@ -181,8 +181,8 @@ const WOMPI_REDIRECT = 'https://jcano18-byte.github.io/Polla_mundialista_LaCande
 
     <div id="config-warn" style="background:rgba(245,158,11,.1);border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;color:#f59e0b;margin-bottom:14px;display:none">⚠️ Configura el Apps Script URL antes de usar la app.</div>
     <div class="login-tabs">
-      <div class="login-tab active" onclick="switchLoginTab('player')" id="lt-player">Participante</div>
-      <div class="login-tab" onclick="switchLoginTab('admin')" id="lt-admin">Administrador</div>
+      <button class="login-tab active" onclick="switchLoginTab('player')" id="lt-player" type="button">Participante</button>
+      <button class="login-tab" onclick="switchLoginTab('admin')" id="lt-admin" type="button">Administrador</button>
     </div>
     <div id="login-player">
       <div class="login-info">Ingresa con el nombre y PIN que te asignó el administrador.</div>
@@ -351,6 +351,13 @@ const WOMPI_REDIRECT = 'https://jcano18-byte.github.io/Polla_mundialista_LaCande
           <button class="btn btn-green" onclick="saveMatchResult()">Guardar resultado</button>
           <div id="admin-match-msg" style="margin-top:8px"></div>
         </div>
+      </div>
+      <!-- Force Update -->
+      <div class="card" style="margin-bottom:1.5rem;border-color:var(--green)">
+        <div class="card-title" style="color:var(--green)">⚡ Actualizar resultados</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Fuerza la descarga de resultados desde la API de football-data.org. Úsalo si el cron automático no actualizó los marcadores.</p>
+        <button class="btn btn-green" onclick="forceUpdateMatchResults()">Forzar actualización</button>
+        <div id="force-update-msg" style="margin-top:8px"></div>
       </div>
       <!-- Open Phases -->
       <div class="card" style="margin-bottom:1.5rem;border-color:var(--blue)">
@@ -845,6 +852,21 @@ async function saveMatchResult(){
   }catch(e){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';}
   setTimeout(()=>msgEl.innerHTML='',4000);
 }
+
+// FORCE UPDATE RESULTS
+async function forceUpdateMatchResults(){
+  const msgEl=document.getElementById('force-update-msg');
+  msgEl.innerHTML='<div class="alert alert-info">Actualizando resultados...</div>';
+  try{
+    const r=await apiPost('forceUpdateResults',{adminToken});
+    if(r.ok){
+      msgEl.innerHTML='<div class="alert alert-success">'+r.msg+'</div>';
+      setTimeout(()=>loadData(),1000);
+    } else msgEl.innerHTML=`<div class="alert alert-error">${r.msg}</div>`;
+  }catch(e){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';}
+  setTimeout(()=>msgEl.innerHTML='',4000);
+}
+
 function renderAdminPlayers(){
   const c=document.getElementById('admin-players-list');
   if(!AP.length){c.innerHTML='<div class="empty">No hay jugadores aún</div>';return}
