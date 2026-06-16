@@ -448,6 +448,12 @@ tr:hover td{background:var(--bg3)}
           <div id="admin-match-msg" style="margin-top:8px"></div>
         </div>
       </div>
+      <div class="card" style="margin-bottom:12px;border-color:rgba(34,197,94,.4)">
+        <div class="card-title" style="color:var(--green)">⚡ Actualizar resultados</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Fuerza la descarga desde la API de football-data.org. Usa si el cron automático no actualizó los marcadores.</div>
+        <button class="btn btn-green" onclick="doForceUpdate()">Forzar actualización</button>
+        <div id="force-update-msg" style="margin-top:8px"></div>
+      </div>
       <div class="card" style="margin-bottom:12px;border-color:rgba(59,130,246,.4)">
         <div class="card-title" style="color:var(--blue)">🔓 Fases habilitadas para pronósticos</div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Habilita la siguiente fase cuando se conozcan los clasificados.</div>
@@ -632,7 +638,8 @@ window.onload = function() {
   }
   var ms = document.getElementById('admin-match-sel');
   if (ms) {
-    BM.forEach(function(m) {
+    var sorted = BM.slice().sort(function(a,b){return new Date(a.d)-new Date(b.d);});
+    sorted.forEach(function(m) {
       var o = document.createElement('option');
       o.value = m.id;
       o.textContent = '['+m.ph+(m.gr?' G'+m.gr:'')+'] '+m.h+' vs '+m.a;
@@ -952,6 +959,7 @@ function renderMatches() {
 function renderMatchList() {
   var f=AM.filter(function(m){return m.ph===mPhase;});
   if(mPhase==='Grupos'&&mGroup!=='Todos') f=f.filter(function(m){return m.gr===mGroup;});
+  f.sort(function(a,b){return new Date(a.d)-new Date(b.d);});
   var html='';
   f.forEach(function(m) {
     var lock=isLocked(m.d), played=m.homeScore!==null&&m.awayScore!==null;
@@ -1205,6 +1213,16 @@ function doSaveResult() {
   msgEl.innerHTML='<div class="alert alert-info">Guardando...</div>';
   apiPost('saveMatchResult',{matchId:parseInt(id,10),homeScore:parseInt(hs,10),awayScore:parseInt(as,10),adminToken:adminToken}).then(function(r){
     if(r.ok){msgEl.innerHTML='<div class="alert alert-success">✓ Resultado guardado</div>';loadData();}
+    else msgEl.innerHTML='<div class="alert alert-error">'+r.msg+'</div>';
+    setTimeout(function(){msgEl.innerHTML='';},4000);
+  }).catch(function(){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';});
+}
+
+function doForceUpdate() {
+  var msgEl=el('force-update-msg');
+  msgEl.innerHTML='<div class="alert alert-info">Actualizando resultados...</div>';
+  apiPost('forceUpdateResults',{adminToken:adminToken}).then(function(r){
+    if(r.ok){msgEl.innerHTML='<div class="alert alert-success">'+r.msg+'</div>';setTimeout(function(){loadData();},1000);}
     else msgEl.innerHTML='<div class="alert alert-error">'+r.msg+'</div>';
     setTimeout(function(){msgEl.innerHTML='';},4000);
   }).catch(function(){msgEl.innerHTML='<div class="alert alert-error">Error de conexión</div>';});
