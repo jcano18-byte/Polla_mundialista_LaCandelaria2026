@@ -1137,7 +1137,9 @@ function renderCmpList() {
       var pr=APreds[p.id]||{}, pred=pr[m.id];
       var isMe=CU&&p.id==CU.id;
       html+='<div class="compare-row" style="pointer-events:'+pointerEvents+'"><div style="color:'+(isMe?'var(--green)':'var(--text2)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px">'+(isMe?'⭐ ':'')+p.name+'</div>';
-      if(!pred||pred.home===null||pred.away===null) {
+      if(!ready&&!played) {
+        html+='<span style="font-size:11px;color:var(--text3);font-style:italic">🔒 Oculto</span>';
+      } else if(!pred||pred.home===null||pred.away===null) {
         html+='<span style="font-size:11px;color:var(--text3);font-style:italic">Sin pronóstico</span>';
       } else {
         var pt=played?calcPts(pred.home,pred.away,m.homeScore,m.awayScore):null;
