@@ -342,7 +342,7 @@ tr:hover td{background:var(--bg3)}
     <div id="tab-comparar" style="display:none">
       <div class="card" style="margin-bottom:1rem">
         <div class="card-title">Participantes a comparar</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Solo se muestran pronósticos de partidos ya jugados.</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Los pronósticos se muestran 5 minutos antes de cada partido para mayor transparencia.</div>
         <div class="player-selector" id="cmp-chips"></div>
       </div>
       <div class="phase-filter" id="cpf"></div>
@@ -825,6 +825,12 @@ function getDeadline(d) {
   return new Date(new Date(d).getTime()-30*60*1000);
 }
 function isLocked(d) { return new Date()>=getDeadline(d); }
+function isMatchReadyToShow(m) {
+  var now=new Date();
+  var matchTime=new Date(m.d);
+  var fiveMinBefore=new Date(matchTime.getTime()-5*60*1000);
+  return now>=fiveMinBefore;
+}
 
 function fmtDate(ds) {
   var d=new Date(ds);
@@ -1116,18 +1122,21 @@ function renderCmpList() {
   var listEl=el('cmp-list');
   var selList=AP.filter(function(p){return !!selPlayers[p.id];});
   if(!selList.length){listEl.innerHTML='<div class="empty">Selecciona participantes para comparar sus pronósticos</div>';return;}
-  var f=AM.filter(function(m){return m.ph===cPhase&&isLocked(m.d);});
+  var f=AM.filter(function(m){return m.ph===cPhase;});
   if(cPhase==='Grupos'&&cGroup!=='Todos') f=f.filter(function(m){return m.gr===cGroup;});
-  if(!f.length){listEl.innerHTML='<div class="empty">No hay partidos jugados en esta fase aún. Los pronósticos se muestran después del pitazo inicial.</div>';return;}
+  if(!f.length){listEl.innerHTML='<div class="empty">No hay partidos en esta fase.</div>';return;}
   var html='';
   f.forEach(function(m) {
     var played=m.homeScore!==null&&m.awayScore!==null;
-    html+='<div class="compare-match"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:11px;color:var(--text3)"><span>'+(m.gr?'Grupo '+m.gr+' · ':'')+fmtDate(m.d)+'</span>'+(played?'<span class="badge badge-green">'+m.homeScore+' - '+m.awayScore+'</span>':'')+'</div>';
+    var ready=isMatchReadyToShow(m);
+    var opacity=ready?'1':'0.5';
+    var pointerEvents=ready?'auto':'none';
+    html+='<div class="compare-match" style="opacity:'+opacity+'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:11px;color:var(--text3)"><span>'+(m.gr?'Grupo '+m.gr+' · ':'')+fmtDate(m.d)+'</span>'+(played?'<span class="badge badge-green">'+m.homeScore+' - '+m.awayScore+'</span>':!ready?'<span class="badge badge-blue" style="opacity:0.6">Bloqueado</span>':'')+'</div>';
     html+='<div style="font-size:13px;font-weight:500;margin-bottom:7px">'+m.h+' vs '+m.a+'</div>';
     selList.forEach(function(p) {
       var pr=APreds[p.id]||{}, pred=pr[m.id];
       var isMe=CU&&p.id==CU.id;
-      html+='<div class="compare-row"><div style="color:'+(isMe?'var(--green)':'var(--text2)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px">'+(isMe?'⭐ ':'')+p.name+'</div>';
+      html+='<div class="compare-row" style="pointer-events:'+pointerEvents+'"><div style="color:'+(isMe?'var(--green)':'var(--text2)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px">'+(isMe?'⭐ ':'')+p.name+'</div>';
       if(!pred||pred.home===null||pred.away===null) {
         html+='<span style="font-size:11px;color:var(--text3);font-style:italic">Sin pronóstico</span>';
       } else {
