@@ -969,13 +969,18 @@ function renderMatchList() {
   var html='';
   f.forEach(function(m) {
     var lock=isLocked(m.d), played=m.homeScore!==null&&m.awayScore!==null;
+    var homeTeam=m.h, awayTeam=m.a;
+    if(knockoutNames&&knockoutNames[m.id]){
+      homeTeam=knockoutNames[m.id].home||m.h;
+      awayTeam=knockoutNames[m.id].away||m.a;
+    }
     html+='<div class="match-card'+(lock?' ':'')+'"><div class="match-meta"><span>'+(m.gr?'Grupo '+m.gr+' · ':'')+fmtDate(m.d)+'</span>';
     html+=(played?'<span class="badge badge-green">✓ Jugado</span>':lock?'<span class="badge badge-amber">En curso</span>':'<span class="badge badge-blue">Próximo</span>');
-    html+='</div><div class="match-teams"><div class="team-name">'+m.h+'</div><div class="score-wrap">';
+    html+='</div><div class="match-teams"><div class="team-name">'+homeTeam+'</div><div class="score-wrap">';
     html+='<div style="width:40px;height:34px;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;font-family:Barlow Condensed,sans-serif">'+(played?m.homeScore:'—')+'</div>';
     html+='<span class="score-sep">:</span>';
     html+='<div style="width:40px;height:34px;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;font-family:Barlow Condensed,sans-serif">'+(played?m.awayScore:'—')+'</div>';
-    html+='</div><div class="team-name">'+m.a+'</div></div></div>';
+    html+='</div><div class="team-name">'+awayTeam+'</div></div></div>';
   });
   el('matches-list').innerHTML=html||'<div class="empty">No hay partidos en esta fase</div>';
 }
