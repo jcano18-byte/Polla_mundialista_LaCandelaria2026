@@ -796,12 +796,30 @@ function loadData() {
 // ============================================================
 // HELPERS
 // ============================================================
-function calcPts(ph,pa,rh,ra) {
+function calcPts(ph,pa,rh,ra,matchId) {
   if (rh===null||ra===null||ph===null||pa===null) return null;
-  if (ph==rh&&pa==ra) return 5;
+
+  // Determine phase from matchId and apply corresponding points
+  var pts={
+    Grupos:{exact:5,diff:3,result:2},
+    '16avos':{exact:6,diff:4,result:3},
+    Octavos:{exact:7,diff:5,result:4},
+    Cuartos:{exact:8,diff:6,result:5},
+    Semis:{exact:9,diff:7,result:6},
+    Final:{exact:10,diff:8,result:7}
+  };
+  var phase='Grupos';
+  if(matchId>72&&matchId<=88)phase='16avos';
+  else if(matchId>88&&matchId<=92)phase='Octavos';
+  else if(matchId>92&&matchId<=96)phase='Cuartos';
+  else if(matchId>96&&matchId<=100)phase='Semis';
+  else if(matchId>100&&matchId<=104)phase='Final';
+
+  var p=pts[phase];
+  if (ph==rh&&pa==ra) return p.exact;
   var rR=rh>ra?'H':rh<ra?'A':'D', pR=ph>pa?'H':ph<pa?'A':'D';
-  if (rR===pR&&(rh-ra)===(ph-pa)) return 3;
-  if (rR===pR) return 2;
+  if (rR===pR&&(rh-ra)===(ph-pa)) return p.diff;
+  if (rR===pR) return p.result;
   return 0;
 }
 
@@ -810,14 +828,26 @@ function calcStats(pid) {
   var pr=APreds[pid]||{};
   AM.forEach(function(m) {
     var p=pr[m.id]; if(!p)return;
-    var pt=calcPts(p.home,p.away,m.homeScore,m.awayScore);
+    if(m.homeScore===null||m.awayScore===null){pen++;return;}
+    var pt=calcPts(p.home,p.away,m.homeScore,m.awayScore,m.id);
     if(pt===null){pen++;return;}
-    tot+=pt; if(pt===5)ex++; else if(pt>=2)par++; else wr++;
+    // Count type of hit based on comparison logic (not by points)
+    if(p.home==m.homeScore && p.away==m.awayScore) {
+      ex++;
+    } else {
+      var rR=m.homeScore>m.awayScore?'H':m.homeScore<m.awayScore?'A':'D';
+      var pR=p.home>p.away?'H':p.home<p.away?'A':'D';
+      if(rR===pR) {
+        par++;
+      } else {
+        wr++;
+      }
+    }
+    tot+=pt;
   });
   var plr=AP.find(function(p){return p.id==pid;});
   var bonus=(champion&&plr&&plr.team&&plr.team.toLowerCase()===champion.toLowerCase())?10:0;
   tot+=bonus;
-  // Tiebreaker criteria: 1) total pts, 2) exactos, 3) parciales, 4) menos fallidos
   return {tot:tot,ex:ex,par:par,wr:wr,pen:pen,cnt:Object.keys(pr).length,bonus:bonus};
 }
 
@@ -1018,8 +1048,10 @@ function renderPredictions() {
     dayMs.forEach(function(m) {
       var lock=isLocked(m.d), played=m.homeScore!==null&&m.awayScore!==null;
       var p=myP[m.id]||{};
-      var pt=played?calcPts(p.home!==undefined?p.home:null,p.away!==undefined?p.away:null,m.homeScore,m.awayScore):null;
-      var pc=pt===5?'var(--green)':pt>=2?'var(--amber)':pt===0?'var(--red)':'var(--text3)';
+      var ph=p.home!==undefined?p.home:null, pa=p.away!==undefined?p.away:null;
+      var pt=played?calcPts(ph,pa,m.homeScore,m.awayScore,m.id):null;
+      var isExact=ph===m.homeScore&&pa===m.awayScore, isPartial=!isExact&&(ph===null||pa===null?false:((m.homeScore>m.awayScore?'H':m.homeScore<m.awayScore?'A':'D')===(ph>pa?'H':ph<pa?'A':'D')));
+      var pc=isExact?'var(--green)':isPartial?'var(--amber)':pt===0?'var(--red)':'var(--text3)';
       var hasPred=p.home!==null&&p.home!==undefined&&p.away!==null&&p.away!==undefined;
       var deadline=getDeadline(m.d);
       var minLeft=Math.round((deadline-new Date())/60000);
@@ -1147,10 +1179,11 @@ function renderCmpList() {
       } else if(!pred||pred.home===null||pred.away===null) {
         html+='<span style="font-size:11px;color:var(--text3);font-style:italic">Sin pronóstico</span>';
       } else {
-        var pt=played?calcPts(pred.home,pred.away,m.homeScore,m.awayScore):null;
-        var sc=pt===5?'exact':pt>=2?'partial':pt===0?'wrong':'';
-        var ptBg=pt===5?'var(--green-bg)':pt>=2?'var(--amber-bg)':pt===0?'var(--red-bg)':'var(--bg4)';
-        var ptCol=pt===5?'var(--green)':pt>=2?'var(--amber)':pt===0?'var(--red)':'var(--text3)';
+        var pt=played?calcPts(pred.home,pred.away,m.homeScore,m.awayScore,m.id):null;
+        var isExact=pred.home===m.homeScore&&pred.away===m.awayScore, isPartial=!isExact&&((m.homeScore>m.awayScore?'H':m.homeScore<m.awayScore?'A':'D')===(pred.home>pred.away?'H':pred.home<pred.away?'A':'D'));
+        var sc=isExact?'exact':isPartial?'partial':pt===0?'wrong':'';
+        var ptBg=isExact?'var(--green-bg)':isPartial?'var(--amber-bg)':pt===0?'var(--red-bg)':'var(--bg4)';
+        var ptCol=isExact?'var(--green)':isPartial?'var(--amber)':pt===0?'var(--red)':'var(--text3)';
         html+='<div style="display:flex;align-items:center;gap:4px"><span class="sc-badge '+sc+'">'+pred.home+'</span><span style="color:var(--text3);font-size:11px">:</span><span class="sc-badge '+sc+'">'+pred.away+'</span>'+(pt!==null?'<span style="background:'+ptBg+';color:'+ptCol+';padding:1px 5px;border-radius:10px;font-size:11px;font-weight:700">'+pt+'p</span>':'')+'</div>';
       }
       html+='</div>';
@@ -1523,10 +1556,10 @@ function renderPerfil() {
       var p = myP[m.id]; if(!p) return;
       var ph = byPhase[m.ph]; if(!ph) return;
       ph.cnt++;
-      var pt = calcPts(p.home,p.away,m.homeScore,m.awayScore);
+      var pt = calcPts(p.home,p.away,m.homeScore,m.awayScore,m.id);
       if(pt===null){ph.pend++;return;}
       ph.tot+=pt;
-      if(pt===5)ph.ex++; else if(pt>=2)ph.par++; else ph.wr++;
+      if(p.home==m.homeScore&&p.away==m.awayScore)ph.ex++; else if((m.homeScore>m.awayScore?'H':m.homeScore<m.awayScore?'A':'D')===(p.home>p.away?'H':p.home<p.away?'A':'D'))ph.par++; else ph.wr++;
     });
 
     var h = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem">'
@@ -1643,9 +1676,11 @@ function openPlayerModal(pid) {
     h += '<div style="display:grid;gap:5px">';
     played.forEach(function(m) {
       var p = myP[m.id];
-      var pt = p ? calcPts(p.home,p.away,m.homeScore,m.awayScore) : null;
-      var ptColor = pt===5?'var(--green)':pt>=2?'var(--amber)':pt===0?'var(--red)':'var(--text3)';
-      var ptBg = pt===5?'var(--green-bg)':pt>=2?'var(--amber-bg)':pt===0?'var(--red-bg)':'var(--bg4)';
+      var pt = p ? calcPts(p.home,p.away,m.homeScore,m.awayScore,m.id) : null;
+      var isExact = p && p.home===m.homeScore && p.away===m.awayScore;
+      var isPartial = p && !isExact && ((m.homeScore>m.awayScore?'H':m.homeScore<m.awayScore?'A':'D')===(p.home>p.away?'H':p.home<p.away?'A':'D'));
+      var ptColor = isExact?'var(--green)':isPartial?'var(--amber)':pt===0?'var(--red)':'var(--text3)';
+      var ptBg = isExact?'var(--green-bg)':isPartial?'var(--amber-bg)':pt===0?'var(--red-bg)':'var(--bg4)';
       h += '<div style="background:var(--bg3);border-radius:8px;padding:8px 10px;display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">'
         +'<div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+m.h+' <span style="color:var(--text3)">'+m.homeScore+'-'+m.awayScore+'</span> '+m.a+'</div>'
         +'<div style="font-size:12px;color:var(--text3)">'+(p&&p.home!==null?p.home+'-'+p.away:'—')+'</div>'
