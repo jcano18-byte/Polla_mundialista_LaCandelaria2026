@@ -858,8 +858,8 @@ function isLocked(d) { return new Date()>=getDeadline(d); }
 function isMatchReadyToShow(m) {
   var now=new Date();
   var matchTime=new Date(m.d);
-  var fiveMinBefore=new Date(matchTime.getTime()-5*60*1000);
-  return now>=fiveMinBefore;
+  var tenMinBefore=new Date(matchTime.getTime()-10*60*1000);
+  return now>=tenMinBefore;
 }
 
 function fmtDate(ds) {
