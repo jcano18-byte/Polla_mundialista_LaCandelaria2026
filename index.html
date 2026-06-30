@@ -851,26 +851,29 @@ function calcStats(pid) {
   return {tot:tot,ex:ex,par:par,wr:wr,pen:pen,cnt:Object.keys(pr).length,bonus:bonus};
 }
 
+function parseMatchDate(ds) {
+  return new Date(ds + ':00-05:00');
+}
 function getDeadline(d) {
-  return new Date(new Date(d).getTime()-30*60*1000);
+  return new Date(parseMatchDate(d).getTime()-30*60*1000);
 }
 function isLocked(d) { return new Date()>=getDeadline(d); }
 function isMatchReadyToShow(m) {
   var now=new Date();
-  var matchTime=new Date(m.d);
+  var matchTime=parseMatchDate(m.d);
   var tenMinBefore=new Date(matchTime.getTime()-10*60*1000);
   return now>=tenMinBefore;
 }
 
 function fmtDate(ds) {
-  var d=new Date(ds);
+  var d=parseMatchDate(ds);
   return d.toLocaleDateString('es-CO',{weekday:'short',day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
 }
 function fmtDay(ds) {
-  return new Date(ds).toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'});
+  return parseMatchDate(ds).toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'});
 }
 function fmtTime(ds) {
-  return new Date(ds).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  return parseMatchDate(ds).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
 }
 
 function buildPhaseBtns(containerId, current, onclickFn, showAll) {
