@@ -618,7 +618,7 @@ var CU = null, isAdmin = false, pendingLogin = null, adminToken = null;
 var groupStandings = {}, knockoutNames = {}, lastUpdated = null;
 var AM = [], AP = [], APreds = {}, paidPlayers = {}, champion = null;
 var PP = {}, selPlayers = {};
-var openPhases = {Grupos:true,'16avos':false,Octavos:true,Cuartos:false,Semis:false,Final:false};
+var openPhases = {Grupos:true,'16avos':true,Octavos:true,Cuartos:true,Semis:true,Final:true};
 var mPhase='Grupos', mGroup='Todos', pPhase='Grupos', cPhase='Grupos', cGroup='Todos';
 
 // ============================================================
@@ -745,7 +745,7 @@ function startApp() {
 function doLogout() {
   CU=null; isAdmin=false; AM=[]; AP=[]; APreds={}; paidPlayers={}; champion=null;
   PP={}; selPlayers={}; pendingLogin=null; adminToken=null;
-  openPhases={Grupos:true,'16avos':false,Octavos:true,Cuartos:false,Semis:false,Final:false};
+  openPhases={Grupos:true,'16avos':true,Octavos:true,Cuartos:true,Semis:true,Final:true};
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('p-username').value = '';
