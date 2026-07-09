@@ -811,10 +811,10 @@ function calcPts(ph,pa,rh,ra,matchId) {
   };
   var phase='Grupos';
   if(matchId>72&&matchId<=88)phase='16avos';
-  else if(matchId>88&&matchId<=92)phase='Octavos';
-  else if(matchId>92&&matchId<=96)phase='Cuartos';
-  else if(matchId>96&&matchId<=100)phase='Semis';
-  else if(matchId>100&&matchId<=104)phase='Final';
+  else if(matchId>88&&matchId<=96)phase='Octavos';
+  else if(matchId>96&&matchId<=100)phase='Cuartos';
+  else if(matchId>100&&matchId<=102)phase='Semis';
+  else if(matchId>102&&matchId<=104)phase='Final';
 
   var p=pts[phase];
   if (ph==rh&&pa==ra) return p.exact;
